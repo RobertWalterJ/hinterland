@@ -202,12 +202,21 @@
       if (document.getElementById('sheet')) { closeSheet(); stay(); return; }
       var QU = root.GRA.quizUI;
       if (QU && QU.active()) {
-        if (QU.phase() === 'done') QU.leave(); else QU.stop();
+        /* back pauses a session; from the pause it ends; from the summary
+           it leaves */
+        var ph = QU.phase();
+        if (ph === 'done') QU.leave();
+        else if (ph === 'paused') QU.stop();
+        else QU.pause();
         stay(); return;
       }
       if (e.state && e.state.hl === 'base') {
-        /* back from the first screen: leave, as the platform expects */
-        histReady = false;
+        /* Back from the first screen: leave, as the platform expects. In an
+           installed app there may be nothing to leave to and the app stays
+           put; history must keep recording (switching it off here meant the
+           NEXT back closed the app from wherever the reader had gone). Any
+           further navigation pushes on top of this entry as normal; another
+           back from here closes the app. */
         history.back();
         return;
       }
@@ -708,6 +717,7 @@
     if (root.GRA.read) root.GRA.read.stop();
     host.innerHTML = '';
     document.body.classList.remove('is-landing');
+    document.body.classList.remove('quiz-mode');
     try {
       fn(host, ctx, phone);
       if (phone && root.GRA.ui.foldLong) root.GRA.ui.foldLong(host);
