@@ -472,13 +472,22 @@
        screen, nothing else competing for attention. */
     var QU = root.GRA.quizUI;
     if (QU && QU.active()) { QU.render(host); return; }
-    if (QU) host.appendChild(QU.hub());
-    /* the province's economy over time: what the data tells, and the
-       sourced longer story */
-    if (root.GRA.history) host.appendChild(root.GRA.history.card());
-    var n = T.counts();
     var focus = A.state.learnFocus;
     A.state.learnFocus = null;
+    if (focus) A.state.learnView = 'words';
+    var view = A.state.learnView || null;
+
+    /* Learn was one 9,000-pixel page with 123 controls. It is now four
+       doors, each its own screen with a way back. */
+    if (!view) { landing(host); return; }
+    host.appendChild(subBar(view));
+    if (view === 'practise') { if (QU) host.appendChild(QU.hub('practise')); return; }
+    if (view === 'ideas') { if (QU) host.appendChild(QU.hub('ideas')); return; }
+    if (view === 'story') {
+      if (root.GRA.history) host.appendChild(root.GRA.history.card());
+      return;
+    }
+    var n = T.counts();
 
     var intro = card('Learn',
       'Hinterland teaches regional science as you use it. Every number in ' +
@@ -522,6 +531,8 @@
       if (!b) return;
       var el = document.getElementById('term-' + b.getAttribute('data-jump'));
       if (el) {
+        var grp = el.closest('details.home-more');
+        if (grp) grp.open = true;
         el.open = true;
         try { el.scrollIntoView({ block: 'center' }); } catch (x) {}
       }
@@ -530,12 +541,21 @@
     host.appendChild(mp);
 
     /* Every term, by group. */
+    /* every term, by group - each group folded, so the page is a list of
+       nine headings rather than six thousand pixels */
+    var gh = h('<h2 class="subh" style="margin:10px 2px 0">Every term</h2>');
+    host.appendChild(gh);
     Object.keys(T.GROUP).forEach(function (g) {
       var terms = T.list.filter(function (t) { return t.group === g; });
       if (!terms.length) return;
-      var c = card(T.GROUP[g], null);
+      var d = document.createElement('details');
+      d.className = 'home-more';
+      d.innerHTML = '<summary>' + esc(T.GROUP[g]) + ' (' + terms.length + ')</summary>';
+      var c = card(null, null);
       terms.forEach(function (t) { c.appendChild(entry(t, ctx, t.id === focus)); });
-      host.appendChild(c);
+      if (terms.some(function (t) { return t.id === focus; })) d.open = true;
+      d.appendChild(c);
+      host.appendChild(d);
     });
 
     if (focus) {
@@ -545,6 +565,66 @@
       }, 60);
     }
   };
+
+  var TILES = [
+    { v: 'practise', t: 'Practise', a: 'Short quiz sessions. No timer.' },
+    { v: 'ideas', t: 'Big ideas', a: 'The nine things the questions add up to, and your progress' },
+    { v: 'story', t: 'Ontario\u2019s story', a: 'How the province\u2019s work has changed, and why' },
+    { v: 'words', t: 'Words and methods', a: 'What each term means, and which method answers which question' }
+  ];
+
+  function landing(host) {
+    var QU = root.GRA.quizUI, S = root.GRA.quizSched;
+    var can = 0;
+    try { can = S.canAnswer(S.load()); } catch (e) {}
+    var c = U.card(null, null, { className: 'home-card' });
+    c.innerHTML = '<h1 class="home-q1">Learn</h1>' +
+      '<p class="home-lede">Regional science, Ontario\u2019s economic history and what ' +
+      'the numbers mean, a little at a time.' +
+      (can ? ' You can answer <b>' + can + '</b> questions so far.' : '') + '</p>' +
+      '<div class="qnextbar"><button type="button" class="btn btn-primary lrn-start">' +
+      'Start a session</button></div>';
+    host.appendChild(c);
+    c.querySelector('.lrn-start').addEventListener('click', function () {
+      if (QU && !QU.start()) {
+        A.state.learnView = 'practise'; A.render();
+      }
+    });
+    var t = U.card(null, null, { className: 'home-card' });
+    var list = document.createElement('div');
+    list.className = 'home-qs';
+    list.innerHTML = TILES.map(function (x) {
+      return '<button type="button" class="home-q" data-v="' + x.v + '">' +
+        '<span class="hq-t" style="grid-column:1 / 3"><span class="hq-q">' + esc(x.t) +
+        '</span><span class="hq-a">' + esc(x.a) + '</span></span>' +
+        '<span class="hq-go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" ' +
+        'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M9 6l6 6-6 6"/></svg></span></button>';
+    }).join('');
+    list.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-v]');
+      if (!b) return;
+      A.state.learnView = b.getAttribute('data-v');
+      A.render();
+      if (A.jump) A.jump(0);
+    });
+    t.appendChild(list);
+    host.appendChild(t);
+  }
+
+  function subBar(view) {
+    var tile = TILES.filter(function (x) { return x.v === view; })[0] || TILES[0];
+    var bar = document.createElement('div');
+    bar.className = 'titlebar';
+    bar.innerHTML = '<button type="button" class="tb-back" aria-label="Back to Learn">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>' +
+      '<span>Learn</span></button><h1 class="tb-title">' + esc(tile.t) + '</h1>';
+    bar.querySelector('.tb-back').addEventListener('click', function () {
+      A.back();
+    });
+    return bar;
+  }
 
   /* ---------------------------------------------- panel readings
 

@@ -69,7 +69,8 @@
   var TITLES = { structure: 'What is it known for?', change: 'How has work changed?',
     population: 'Is it growing?', impact: 'What if new jobs arrived?',
     hoods: 'How do its neighbourhoods differ?', brief: 'The brief',
-    sources: 'Where the numbers come from' };
+    sources: 'Where the numbers come from', peers: 'Which places are like it?',
+    map: 'Explore the map' };
   A.TITLES = TITLES;
   A.TABS = TABS;
 
@@ -109,7 +110,7 @@
       wireReader();
       initHistory();
       bootEl.classList.add('gone');
-      setTimeout(function () { bootEl.remove(); }, 400);
+      setTimeout(function () { if (bootEl.remove) bootEl.remove(); }, 400);
       /* The tract layer and the polygons are not needed to answer the first
          question, so they arrive after the first paint. */
       D.loadBoundaries('csd');
@@ -172,8 +173,9 @@
     /* The shareable hash is a convenience, and some embedded viewers refuse
        history writes. Losing the hash must never cost the render. */
     try {
-      var h = new URLSearchParams({ p: A.state.place, b: A.state.benchmark,
-                                    t: A.state.tab });
+      var hp = { p: A.state.place, b: A.state.benchmark, t: A.state.tab };
+      if (A.state.tab === 'learn' && A.state.learnView) hp.v = A.state.learnView;
+      var h = new URLSearchParams(hp);
       var hash = '#' + h.toString();
       var moved = navKey(hash) !== navKey(lastHash);
       if (histReady && moved && !fromPop) {
@@ -204,7 +206,7 @@
   var lastHash = '', histReady = false, fromPop = false;
   function navKey(hash) {
     var h = new URLSearchParams(String(hash || '').replace(/^#/, ''));
-    return (h.get('p') || '') + '|' + (h.get('t') || '');
+    return (h.get('p') || '') + '|' + (h.get('t') || '') + '|' + (h.get('v') || '');
   }
   function initHistory() {
     try {
@@ -243,6 +245,7 @@
       fromPop = true;
       try {
         if (h.get('b')) A.state.benchmark = h.get('b');
+        A.state.learnView = h.get('v') || null;
         var p = h.get('p'), t = h.get('t');
         if (t) A.state.tab = t;
         if (p && p !== A.state.place && D.byCode[p]) A.setPlace(p);
@@ -363,6 +366,10 @@
   A.jump = jump;
 
   A.go = function (tab) {
+    /* the Learn tab always opens on its four doors */
+    if (tab === 'learn' && A.state.tab !== 'learn' && A.state.learnView !== 'story') {
+      A.state.learnView = null;
+    }
     A.state.tab = tab;
     A.render();
     jump(0);
@@ -742,6 +749,7 @@
     renderTabs();
     var host = document.getElementById('view');
     var P = root.GRA.panels;
+    if (!P || !host || !host.appendChild) return;   /* headless (node self-tests) */
     var phone = window.matchMedia('(max-width: 720px)').matches;
     var tab = A.state.tab;
 
@@ -787,15 +795,17 @@
     bar.className = 'titlebar';
     var name = ctx.place.level === 'CT' ? D.tractLabel(ctx.place.code).title : ctx.place.name;
     var usesRef = tab === 'structure' || tab === 'change';
-    bar.innerHTML = '<button type="button" class="tb-back" aria-label="Back to ' +
+    var root_ = SECTION[tab] === tab;     /* a tab of its own: no way "back" to show */
+    bar.innerHTML = (root_ ? '' : '<button type="button" class="tb-back" aria-label="Back to ' +
       C.esc(name.split(' / ')[0]) + '">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
       'stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>' +
-      '<span>' + C.esc(name.split(' / ')[0]) + '</span></button>' +
+      '<span>' + C.esc(name.split(' / ')[0]) + '</span></button>') +
       '<h1 class="tb-title">' + C.esc(TITLES[tab]) + '</h1>' +
       (usesRef ? '<button type="button" class="tb-ref">Compared with ' +
         C.esc(ctx.ref ? ctx.ref.label : 'Ontario') + ' \u25be</button>' : '');
-    bar.querySelector('.tb-back').addEventListener('click', A.back);
+    var bk = bar.querySelector('.tb-back');
+    if (bk) bk.addEventListener('click', A.back);
     var r = bar.querySelector('.tb-ref');
     if (r) r.addEventListener('click', A.openBenchmarkPicker);
     return bar;
@@ -845,6 +855,7 @@
     var phone = window.matchMedia('(max-width: 720px)').matches;
     var p = ctx.place;
     var pc = document.getElementById('placeChip');
+    if (!pc || !pc.querySelector || !pc.querySelector('.v')) return;   /* no header (node test harness) */
     pc.querySelector('.v').textContent =
       p.level === 'CT' ? D.tractLabel(p.code).title : p.name;
     /* On a phone the chips share one row, so the labels shorten rather than

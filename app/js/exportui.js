@@ -533,6 +533,14 @@
 
   /* --------------------------------------------------------- the sheet */
 
+  function briefText(ctx) {
+    var c = root.GRA.brief.compose(ctx);
+    return c.paras.map(function (p) {
+      return String(p.text).replace(/<[^>]+>/g, '');
+    }).join('\n\n') + '\n\nWhat this cannot tell you\n\n' +
+      c.caveats.map(function (t) { return String(t).replace(/<[^>]+>/g, ''); }).join('\n\n');
+  }
+
   E.open = function (ctx) {
     init();
     if (!ctx || !ctx.local) {
@@ -570,8 +578,16 @@
         on: false }
     ];
 
+    /* On a phone: share first (the phone's own share sheet), and no GIS
+       formats - nobody joins a shapefile on a phone, and six formats were
+       the loudest thing in the sheet. */
+    var phone = window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+    var canShare = !!(navigator.share);
     var body =
       '<div class="sheet-body">' +
+      (canShare ? '<div style="padding:0 8px 12px"><button type="button" ' +
+        'class="btn btn-primary" data-fmt="share" style="width:100%;min-height:52px;' +
+        'justify-content:center;font-size:17px">Share the brief</button></div>' : '') +
       '<p class="card-note" style="padding:0 8px">Every file carries its ' +
       'provenance: the workbook opens on a sheet naming the place, the ' +
       'benchmark, the period, every method used and every caveat that applies.</p>' +
@@ -592,14 +608,14 @@
           fmtBtn('csv', 'CSV files',
                  'One file per selected table. UTF-8 with a byte-order mark so Excel ' +
                  'opens accented names correctly.') +
-          fmtBtn('dbf', 'DBF (.dbf, zipped)',
+          (phone ? '' : fmtBtn('dbf', 'DBF (.dbf, zipped)',
                  'dBase III attribute table for joining to boundaries already in a ' +
                  'GIS project. Field names are abbreviated to 10 characters and the ' +
                  'mapping ships alongside.') +
           fmtBtn('shp', 'Shapefile (.shp/.shx/.dbf/.prj, zipped)',
                  'Geometry and attributes together, WGS 84. Drag straight into QGIS ' +
                  'or ArcGIS.') +
-          fmtBtn('geojson', 'GeoJSON', 'The same, for anything modern.') +
+          fmtBtn('geojson', 'GeoJSON', 'The same, for anything modern.')) +
           fmtBtn('brief', 'The brief, as text',
                  'The written finding and its caveats, plus the citations.')
         : fmtBtn('copycsv', 'Copy the tables as CSV',
@@ -630,6 +646,13 @@
       if (!b) return;
       var fmt = b.getAttribute('data-fmt');
       var foot = el.querySelector('#expFoot');
+      if (fmt === 'share') {
+        navigator.share({ title: 'Hinterland: ' + ctx.place.name.split(' / ')[0],
+                          text: briefText(ctx) })
+          .then(function () { foot.textContent = 'Shared.'; })
+          .catch(function () { foot.textContent = 'Not shared.'; });
+        return;
+      }
       foot.textContent = 'Building…';
       setTimeout(function () {
         try {

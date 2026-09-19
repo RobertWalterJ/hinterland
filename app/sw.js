@@ -33,7 +33,7 @@
    Bump VERSION to evict an old cache wholesale. */
 
 var PREFIX = 'hinterland-';
-var VERSION = PREFIX + 'v14';
+var VERSION = PREFIX + 'v15';
 /* Caches this app created under its old working name, on origins it has
    always had to itself (the local launcher). Safe to clear; nobody else's. */
 var LEGACY = 'gra-';
@@ -55,7 +55,7 @@ var SHELL = [
   'js/findings.js',
   'js/spatial.js',
   'js/ttwa.js', 'js/brief.js', 'js/exportui.js', 'js/panels.js',
-  'js/panel-population.js', 'js/panel-region.js', 'js/panel-impact.js', 'js/panel-change.js', 'js/panel-known.js',
+  'js/panel-population.js', 'js/panel-region.js', 'js/panel-impact.js', 'js/panel-change.js', 'js/panel-known.js', 'js/panel-compare.js',
   'js/learn.js', 'js/home.js', 'js/quiz-bank.js', 'js/quiz-ideas.js', 'js/quiz-sched.js', 'js/quiz-ui.js',
   'js/app.js',
   'manifest.webmanifest'
@@ -96,14 +96,24 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(req.url);
   if (url.origin !== location.origin) return;
 
+  /* Network first - but not forever. On a weak signal (a council chamber,
+     a basement) a request can hang for a minute before failing, and the app
+     looked frozen. After four seconds a cached copy, if there is one, is
+     used; the network answer still refreshes the cache when it arrives. */
+  var net = fetch(req).then(function (res) {
+    if (res && res.ok && res.type === 'basic') {
+      var copy = res.clone();
+      caches.open(VERSION).then(function (c) { c.put(req, copy); });
+    }
+    return res;
+  });
+  var slow = new Promise(function (resolve) {
+    setTimeout(function () {
+      fromOurCache(req).then(function (hit) { if (hit) resolve(hit); });
+    }, 4000);
+  });
   e.respondWith(
-    fetch(req).then(function (res) {
-      if (res && res.ok && res.type === 'basic') {
-        var copy = res.clone();
-        caches.open(VERSION).then(function (c) { c.put(req, copy); });
-      }
-      return res;
-    }).catch(function (err) {
+    Promise.race([net, slow]).catch(function (err) {
       return fromOurCache(req).then(function (hit) {
         if (hit) return hit;
         /* Navigations get the shell so the app still opens offline. Everything

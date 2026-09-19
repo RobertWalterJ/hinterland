@@ -596,12 +596,12 @@
       .slice(0, n || 4).map(function (it) { return it.card.sentence; });
   }
 
-  QU.hub = function () {
+  QU.hub = function (mode) {
     init();
     var s = st(), set = settings();
     var bank = B.build();
     var prog = S.progress(s, bank);
-    var c = U.card('Your learning', null);
+    var c = U.card(null, null);
 
     var weekUp = prog.weekAgoCan != null ? prog.can - prog.weekAgoCan : null;
     var head = '<div class="qhub-top">' +
@@ -647,11 +647,14 @@
     }).join('') : '';
 
     var body = document.createElement('div');
-    body.innerHTML = head + nums +
-      '<h3 class="subh" style="margin-top:18px">The big ideas</h3>' +
-      '<p class="card-note">Each question is part of one of these. They open in order, ' +
-      'from what many people know to what only the data shows.</p>' +
-      '<div class="qideas">' + ideas + '</div>' +
+    var showIdeas = mode !== 'practise';
+    var showPractise = mode !== 'ideas';
+    body.innerHTML = (showPractise ? head + nums : '') +
+      (showIdeas ? '<p class="card-note" style="margin-top:4px">Each question is part of one ' +
+        'of these. They open in order, from what many people know to what only the data ' +
+        'shows. Tap one to see its lesson and what you have learned.</p>' +
+        '<div class="qideas">' + ideas + '</div>' : '') +
+      (showPractise ? '' : '<div hidden>') +
       '<details class="qsettings"><summary>Settings</summary><div class="qset">' +
       '<label class="toggle"><input type="checkbox" class="qread"' +
       (set.read ? ' checked' : '') + '> Read each question to me</label>' +
@@ -666,13 +669,13 @@
           '>' + esc(String(D.geo.er_names[er]).split(' / ')[0].replace(/--/g, '–')) + '</option>';
       }).join('') + '</select></label>' +
       '<p class="card-foot">Questions about your home region come first: new facts ' +
-      'stick better when they attach to places you know.</p></div></details>';
+      'stick better when they attach to places you know.</p></div></details>' +
+      (showPractise ? '' : '</div>');
     c.appendChild(body);
 
-    body.querySelector('.qstart').addEventListener('click', function () {
-      if (!QU.start()) {
-        body.querySelector('.qstart').textContent = 'Nothing new just now. Come back later.';
-      }
+    var qs = body.querySelector('.qstart');
+    if (qs) qs.addEventListener('click', function () {
+      if (!QU.start()) qs.textContent = 'Nothing new just now. Come back later.';
     });
     body.querySelector('.qread').addEventListener('change', function (e) {
       var x = settings(); x.read = e.target.checked; saveSettings(x);

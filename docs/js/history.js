@@ -187,12 +187,17 @@
   H.stories = function () {
     init();
     var a = leadership(2001), b = leadership(2011);
+    /* the story continues on the pair counted the same way (both years
+       count the employed): 2016 and 2021 */
+    var c16 = leadership(2016), c21 = leadership(2021);
     var mf = D.naics.filter(function (n) { return n.code === '31-33'; })[0].short;
     var hs = D.naics.filter(function (n) { return n.code === '62'; })[0].short;
     var on = D.pop.data['35'] || {};
     return {
       manufacturing2001: a.counts[mf] || 0, manufacturing2011: b.counts[mf] || 0,
       health2001: a.counts[hs] || 0, health2011: b.counts[hs] || 0,
+      manufacturing2016: c16.counts[mf] || 0, manufacturing2021: c21.counts[mf] || 0,
+      health2016: c16.counts[hs] || 0, health2021: c21.counts[hs] || 0,
       leaders2001: a, leaders2011: b,
       natural: naturalDecrease(),
       pop2001: on['2001'], pop2025: on['2025']
@@ -249,7 +254,13 @@
       'residents in <b>' + s.manufacturing2001 + '</b> Ontario municipalities. ' +
       'By 2011 it was <b>' + s.manufacturing2011 + '</b>. Over the same decade, ' +
       'places led by health and social services went from ' + s.health2001 +
-      ' to ' + s.health2011 + '.</p>' +
+      ' to ' + s.health2011 + '.' +
+      (s.manufacturing2021 < s.manufacturing2016 && s.health2021 > s.health2016
+        ? ' It has not stopped: from 2016 to 2021, counted the same way both years, ' +
+          'manufacturing-led places went from ' + s.manufacturing2016 + ' to ' +
+          s.manufacturing2021 + ', and health-led places from ' + s.health2016 +
+          ' to ' + s.health2021 + '.'
+        : '') + '</p>' +
       (first && peak
         ? '<p class="explain-plain"><b>Deaths overtaking births.</b> In ' +
           first.year + ', ' + first.dec + ' of Ontario’s ' + first.n +

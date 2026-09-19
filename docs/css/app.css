@@ -1441,3 +1441,37 @@ body.quiz-mode main { padding-bottom: 24px; }
 .kn-track { height: 10px; border-radius: 5px; background: var(--surface-sunk); margin-top: 6px; overflow: hidden; }
 .kn-track i { display: block; height: 100%; border-radius: 5px; background: var(--bar-ink); }
 .kn-sub { font-size: 14.5px; color: var(--ink-2); margin-top: 4px; }
+.cmp-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.ctl-lead { flex: 1 0 100%; font-size: 15px; color: var(--ink-2); }
+
+/* ---------------------------------------------- reading floor
+   The design review measured drill-down text at 10.5-14.5px on a phone,
+   against 17-20px on Home and the quiz. The British Dyslexia Association's
+   guidance and WCAG 1.4.4 point the same way: body 17px, secondary 15px,
+   nothing below 13px (chart labels only). And no capitals-only labels:
+   whole words in capitals lose their shape, which is how many dyslexic
+   readers recognise them. */
+.eyebrow, .qlesson-n, .qidea-h, .peek-q, .picker-group, .optlist .grp,
+.sheet .eyebrow, .brief .eyebrow { text-transform: none !important; letter-spacing: 0 !important; }
+@media (max-width: 720px) {
+  body { font-size: 17px; }
+  .card h3 { font-size: 18px; }
+  .card-note, .gloss, .explain-plain, .peek-answer, .prose, .tl-fact { font-size: 16px; }
+  .card-foot, .qsource, .home-small { font-size: 15px; }
+  .stat .l { font-size: 15px; }
+  .stat .h { font-size: 14px; }
+  .sectorrow .nm { font-size: 16.5px; }
+  .sectorrow .meta, .meta { font-size: 14.5px; }
+  .eyebrow { font-size: 14.5px; font-weight: 650; }
+  .seg button, .sel, .btn { font-size: 15.5px; }
+  .term-chip { font-size: 15px; }
+  table.data { font-size: 14.5px; }
+  .ax, .chart text { font-size: 13px; }
+}
+.wordmark-sub, table.data th, .flag, .opt .kind, .group-label { text-transform: none !important; letter-spacing: 0 !important; }
+.group-label { font-size: 14px; }
+.opt .kind { font-size: 13px; }
+.opt .nm small, .opt .sz { font-size: 14px; }
+.flag { font-size: 12.5px; }
+table.data th { font-size: 13px; }
+@media (max-width: 720px) { .opt { min-height: 52px; font-size: 16.5px; } .search { font-size: 17px; } }
