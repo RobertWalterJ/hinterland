@@ -28,6 +28,11 @@
   }
 
   function card(title, noteHTML, opts) {
+    /* card() is shared through GRA.ui with modules that are not panels -
+       learn.js, history.js, the quiz. When the app reopens straight onto one
+       of those, nothing in this file has run init() yet, so the helper must
+       not depend on it. */
+    if (!C) init();
     opts = opts || {};
     var c = document.createElement('div');
     c.className = 'card' + (opts.className ? ' ' + opts.className : '');
@@ -49,6 +54,7 @@
   }
 
   function table(columns, rows, opts) {
+    if (!C) init();   /* shared via GRA.ui - see card() */
     opts = opts || {};
     var w = document.createElement('div');
     w.className = 'tbl-wrap';
@@ -95,6 +101,7 @@
   }
 
   function seg(items, current, onPick) {
+    if (!C) init();   /* shared via GRA.ui - see card() */
     var s = document.createElement('div');
     s.className = 'seg';
     s.innerHTML = items.map(function (it) {
@@ -586,6 +593,7 @@
       }));
     }));
     cMix.appendChild(foot);
+    if (root.GRA.learn) root.GRA.learn.teach(cMix, ['location-quotient', 'reference-economy'], root.GRA.learn && root.GRA.learn.readMix(rows, ctx.place.name, ctx.ref.label));
     host.appendChild(cMix);
 
     /* the table */
@@ -643,6 +651,7 @@
         'no location-quotient excess by construction. For a usable export base, ' +
         'benchmark against Canada, or against a peer group.</div>'));
     }
+    if (root.GRA.learn) root.GRA.learn.teach(cB, ['economic-base', 'multiplier'], root.GRA.learn && root.GRA.learn.readBase(ctx.base, ctx.ref.label));
     host.appendChild(cB);
 
     /* business counts cross-check */
@@ -805,7 +814,7 @@
     /* the waterfall */
     var cW = card('Where the change came from, ' + ch.y0 + ' to ' + ch.y1,
       'Resident labour force by industry — where workers live, not where the ' +
-      'jobs are. Read left to right: the reference economy grew, which alone ' +
+      'jobs are. Read left to right: the reference economy grew or shrank, which alone ' +
       'would have given this place one figure; its starting industry mix was ' +
       'better or worse than average, worth a second; and its own performance ' +
       'in those industries accounts for the rest.');
@@ -870,6 +879,7 @@
         'Ontario was used.' : '') + ' </div>');
     identityNote.appendChild(wfoot0);
     cW.appendChild(identityNote);
+    if (root.GRA.learn) root.GRA.learn.teach(cW, ['shift-share', 'industry-mix-effect', 'competitive-effect'], root.GRA.learn && root.GRA.learn.readShiftShare(t, ch, ctx.place.name, ctx.state.emView));
     host.appendChild(cW);
 
     /* competitive by sector */
@@ -939,6 +949,7 @@
       cQ.appendChild(h('<div class="card-foot">Sectors with fewer than 40 jobs at ' +
         'the start are left out: their growth rates are dominated by census ' +
         'rounding.</div>'));
+      if (root.GRA.learn) root.GRA.learn.teach(cQ, ['allocation-effect', 'specialisation'], null);
       host.appendChild(cQ);
     }
 
@@ -971,6 +982,7 @@
         C.signed(t.competitive) + ' jobs. Chained: ' + C.signed(dt.competitive) +
         ' jobs. A large gap between the two means the base-year mix was doing ' +
         'a lot of work, and the chained figure is the one to quote.</div>'));
+      if (root.GRA.learn) root.GRA.learn.teach(cD, ['chained'], null);
       host.appendChild(cD);
     }
 
@@ -1081,6 +1093,7 @@
           'so the ranking fell back to standardised Euclidean distance.</div>'));
       }
     }
+    if (root.GRA.learn) root.GRA.learn.teach(cM, ['peers', 'mix-distance'], null);
     host.appendChild(cM);
 
     /* the peer list */
@@ -1300,6 +1313,7 @@
       'years — a change measured across redrawn boundaries is not a change. ' +
       'At this scale random rounding to 5 bites hard: cells at or below ' +
       M.MIN_RELIABLE_CELL + ' workers are withheld.');
+    if (root.GRA.learn) root.GRA.learn.teach(intro, ['random-rounding', 'sampling-error'], null);
     host.appendChild(intro);
 
     /* sector selector for the map and ranking */
@@ -1840,6 +1854,7 @@
         'fixed workplace address. Flows below the suppression threshold are ' +
         'withheld, so these are the largest links rather than all of them, ' +
         'and they will not sum to the totals on the Overview tab.</div>'));
+      if (root.GRA.learn) root.GRA.learn.teach(cF, ['self-containment', 'jobs-ratio'], null);
       host.appendChild(cF);
       ctx.mapTable = { rows: fRows, title: 'Commuting flows',
                        fmt: function (v) { return C.fmt(v); } };

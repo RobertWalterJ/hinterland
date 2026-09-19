@@ -405,10 +405,11 @@
     var s = st(), set = settings();
     var prog = S.progress(s);
     var names = { A: 'Size', B: 'What people do', C: 'Connections',
-                  D: 'The long view', E: 'Methods' };
+                  D: 'The long view', E: 'Methods', F: 'History' };
     var c = U.card('Quiz', 'Short sessions of about twelve questions. No ' +
-      'timer, no score, and you can stop at any point. Every answer is drawn ' +
-      'from the same Statistics Canada data as the rest of the tool.');
+      'timer, no score, and you can stop at any point. Every answer about ' +
+      'places is drawn from the same Statistics Canada data as the rest of ' +
+      'the tool; history questions come from the dated, sourced timeline.');
 
     var body = document.createElement('div');
     body.innerHTML =

@@ -195,6 +195,7 @@
       'direct; Type II adds induced. Ontario ' + D.io.year +
       ', within-province coverage, Statistics Canada ' + D.io.source +
       '.</div>'));
+    if (root.GRA.learn) root.GRA.learn.teach(c, ['multiplier', 'flegg-webber'], null);
     host.appendChild(c);
 
     /* ----------------------------------------- how it compares */

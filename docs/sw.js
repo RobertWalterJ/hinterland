@@ -33,7 +33,7 @@
    Bump VERSION to evict an old cache wholesale. */
 
 var PREFIX = 'hinterland-';
-var VERSION = PREFIX + 'v9';
+var VERSION = PREFIX + 'v10';
 /* Caches this app created under its old working name, on origins it has
    always had to itself (the local launcher). Safe to clear; nobody else's. */
 var LEGACY = 'gra-';
@@ -51,7 +51,7 @@ var SHELL = [
   'index.html',
   'css/app.css',
   'js/methods.js', 'js/data.js', 'js/charts.js', 'js/map.js',
-  'js/export.js', 'js/sound.js', 'js/read.js', 'js/terms.js',
+  'js/export.js', 'js/sound.js', 'js/read.js', 'js/terms.js', 'js/history.js',
   'js/findings.js',
   'js/spatial.js',
   'js/ttwa.js', 'js/brief.js', 'js/exportui.js', 'js/panels.js',

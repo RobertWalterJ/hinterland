@@ -25,7 +25,7 @@ globalThis.fetch = (u) => {
 };
 
 const geval = eval;
-for (const f of ['methods.js', 'charts.js', 'data.js', 'terms.js', 'quiz-bank.js']) {
+for (const f of ['methods.js', 'charts.js', 'data.js', 'terms.js', 'history.js', 'quiz-bank.js']) {
   geval(fs.readFileSync(path.join(APP, 'js', f), 'utf8'));
 }
 const G = globalThis.GRA;

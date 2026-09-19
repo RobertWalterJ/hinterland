@@ -67,7 +67,7 @@
     leechLapses: 4,            /* a question missed this often is not being
                                   learned by drilling it daily; space it out */
     leechFloor: 3,             /* days */
-    mix: { A: 0.2, B: 0.3, C: 0.2, D: 0.1, E: 0.2 },  /* target share of new
+    mix: { A: 0.18, B: 0.28, C: 0.18, D: 0.08, E: 0.18, F: 0.10 },  /* target share of new
                                   questions by strand, so none starves */
     heldAfterDays: 7,          /* the only definition of "learned" */
     overdueCap: 2.0,           /* an item is never treated as more than 2x overdue */

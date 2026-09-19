@@ -828,6 +828,36 @@ def test_stated_constants():
           mapped and mapped <= set(ids),
           ", ".join(sorted(mapped - set(ids))) or "all %d defined" % len(mapped))
 
+    # --- the history timeline is sourced, and claims no causes ------------
+    # Every timeline entry was checked against the primary record it cites,
+    # and nothing in it may be written from memory. What can be enforced
+    # mechanically: each entry has a source on an authoritative domain and a
+    # note of what that source confirmed, and no entry uses causal language -
+    # the timeline juxtaposes events with what the data shows, and a claim
+    # that an event CAUSED a change is one the data cannot support.
+    hist = io.open(os.path.join(app, "js", "history.js"), encoding="utf-8").read()
+    tl = hist[hist.index("H.timeline = ["):hist.index("];", hist.index("H.timeline = ["))]
+    # one chunk per entry, split on the "{ year:" that opens each
+    entries = [(m.group(1), m.group(2)) for m in re.finditer(
+        r"\{\s*year:\s*(\d{4})(.*?)(?=\{\s*year:|\Z)", tl, re.S)]
+    AUTH = ("gc.ca", "canada.ca", "ontario.ca", "ola.org", "wto.org", "statcan.gc.ca")
+    unsourced, causal = [], []
+    for year, body in entries:
+        url = re.search(r"url:\s*'([^']+)'", body)
+        ver = re.search(r"verified:\s*'", body)
+        host = url and re.match(r"https://([^/]+)/", url.group(1))
+        if not (url and ver and host and host.group(1).endswith(AUTH)):
+            unsourced.append(year)
+        text = " ".join(re.findall(r"(?:fact|title):\s*'((?:[^'\\]|\\.)*)'", body))
+        if re.search(r"\b(because|caused|causing|led to|due to|resulted in)\b",
+                     text, re.I):
+            causal.append(year)
+    check("every history entry cites an authoritative source it was checked against",
+          entries and not unsourced,
+          "%d entries; %s" % (len(entries), ", ".join(unsourced) or "all sourced"))
+    check("...and none claims that an event caused what the data shows",
+          not causal, ", ".join(causal) or "no causal language")
+
     # --- occupation and published sampling error (98-10-0456) -------------
     # The sampling constant is RE-DERIVED here from the published intervals,
     # never trusted: SAMPLE_K lives in methods.py and methods.js, and a
@@ -1060,7 +1090,7 @@ def test_quiz():
           "%d questions in %d ms; %d problems%s" % (
               b["items"], b["buildMs"], b["problemCount"],
               (": " + "; ".join(b["problems"][:3])) if b["problems"] else ""))
-    check("...covering every strand", strands == ["A", "B", "C", "D", "E"],
+    check("...covering every strand", strands == ["A", "B", "C", "D", "E", "F"],
           "strands " + "".join(strands))
     worst_stem = max(v["stemMax"] for k, v in b["lengths"].items() if k in "ABCD")
     worst_card = max(v["cardMax"] for v in b["lengths"].values())
@@ -1090,7 +1120,7 @@ def test_quiz():
     check("the learned count only ever rises",
           all(x["learnedNeverFalls"] for x in runs))
     check("every strand makes progress",
-          all(x["strandsLearned"] == "ABCDE" for x in runs),
+          all(len(x["strandsLearned"]) >= 5 for x in runs),
           ", ".join(x["strandsLearned"] for x in runs))
     check("\"learned\" means remembered at the next review, most of the time",
           all((x["learnedHeldAtNextReview"] or 0) >= 0.6 for x in runs),

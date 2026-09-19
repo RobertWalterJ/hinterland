@@ -199,6 +199,7 @@
       'The components will not sum exactly to the change in population, ' +
       'because Statistics Canada carries a residual term that is excluded ' +
       'here.</div>'));
+    if (root.GRA.learn) root.GRA.learn.teach(cc, ['components', 'natural-increase'], null);
     host.appendChild(cc);
   }
 

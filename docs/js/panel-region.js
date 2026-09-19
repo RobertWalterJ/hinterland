@@ -61,6 +61,7 @@
 
     var body = h('<div></div>');
     c.appendChild(body);
+    if (root.GRA.learn) root.GRA.learn.teach(c, ['morans-i', 'lisa', 'getis-ord', 'false-discovery'], null);
     body.innerHTML = '<div class="skel" style="height:96px"></div>';
     host.appendChild(c);
 
@@ -246,6 +247,7 @@
       'a boundary falls.');
     var body = h('<div><div class="skel" style="height:80px"></div></div>');
     c.appendChild(body);
+    if (root.GRA.learn) root.GRA.learn.teach(c, ['ttwa', 'self-containment'], null);
     host.appendChild(c);
 
     afterLayout(function () {

@@ -648,6 +648,94 @@
     });
   }
 
+  /* ============================================ strand F: history */
+
+  /* F1 - which came first? Pairs from the SOURCED timeline (history.js),
+     each entry checked against its primary record. At least four years
+     apart, so the order is never a matter of months. */
+  function genWhichFirst(out) {
+    var H = root.GRA.history;
+    if (!H || !H.timeline) return;
+    var tl = H.timeline;
+    for (var i = 0; i < tl.length; i++) {
+      for (var j = i + 1; j < tl.length; j++) {
+        var a = tl[i], b = tl[j];
+        if (Math.abs(a.year - b.year) < 4) continue;
+        /* 'The Auto Pact' before 'The Auto Pact's exemption ends' is logic,
+           not history: a shared word gives the order away */
+        if (sharesWord(a.title, b.title)) continue;
+        var early = a.year < b.year ? a : b, late = early === a ? b : a;
+        out.push(item({
+          id: 'F1:' + early.year + '-' + late.year + ':' +
+            early.title.slice(0, 12) + '/' + late.title.slice(0, 12),
+          strand: 'F', form: 'which-first',
+          chip: { universe: 'Ontario’s economic history', when: '' },
+          stem: 'Which came first?',
+          options: [{ label: early.title, correct: true },
+                    { label: late.title, correct: false }],
+          card: {
+            sentence: early.title + ' came first, in ' + early.year +
+              '. ' + late.title + ' followed in ' + late.year + '.',
+            more: early.fact,
+            picture: null
+          },
+          prior: Math.abs(a.year - b.year) > 15 ? 0.3 : 0.55,
+          terms: []
+        }));
+      }
+    }
+  }
+
+  /* F2 - history the data tells: questions generated from the same figures
+     the Learn tab shows, so the quiz and the page cannot disagree. */
+  function genDataHistory(out) {
+    var H = root.GRA.history;
+    if (!H || !H.stories) return;
+    var s = H.stories();
+    if (s.manufacturing2001 && s.manufacturing2011 &&
+        s.manufacturing2011 < s.manufacturing2001) {
+      out.push(item({
+        id: 'F2:manufacturing', strand: 'F', form: 'data-history',
+        chip: { universe: 'Where people live', when: '2001 to 2011' },
+        stem: 'Towns led by manufacturing, 2001 to 2011?',
+        options: [
+          { label: 'Far fewer', correct: true },
+          { label: 'About the same', correct: false },
+          { label: 'Far more', correct: false }],
+        card: {
+          sentence: 'Far fewer: from ' + s.manufacturing2001 + ' municipalities to ' +
+            s.manufacturing2011 + '.',
+          more: 'Counted where manufacturing clearly led, beyond sampling error.',
+          picture: null
+        },
+        prior: 0.35, terms: ['place-of-residence']
+      }));
+    }
+    var nd = s.natural['2011b'] || [];
+    var nd2 = s.natural['2021b'] || [];
+    var first = nd[0], peak = nd2.reduce(function (m, r) {
+      return !m || r.dec > m.dec ? r : m; }, null);
+    if (first && peak && peak.dec >= 3 * Math.max(1, first.dec)) {
+      var opts = [first.dec, Math.round(peak.dec / 3), peak.dec];
+      if (new Set(opts).size === 3) {
+        out.push(item({
+          id: 'F2:natural-' + first.year, strand: 'F', form: 'data-history',
+          chip: { universe: 'Census division · population', when: String(first.year) },
+          stem: 'Divisions with more deaths than births, ' + first.year + '?',
+          options: opts.map(function (v) {
+            return { label: v + ' of ' + first.n, correct: v === first.dec };
+          }),
+          card: {
+            sentence: first.dec + ' of ' + first.n + ' in ' + first.year +
+              '. By ' + peak.year + ' it was ' + peak.dec + '.',
+            picture: null
+          },
+          surprise: 0.5, prior: 0.6, terms: ['natural-increase']
+        }));
+      }
+    }
+  }
+
   /* ---------------------------------------------------------- build */
 
   Q.build = function () {
@@ -659,6 +747,7 @@
     genCommute(out, 'out'); genCommute(out, 'in'); genTwin(out);
     genNatural(out);
     genWhichMethod(out); genCannot(out); genReadLQ(out);
+    genWhichFirst(out); genDataHistory(out);
     var byId = {};
     out.forEach(function (it) { byId[it.id] = it; });
     Q._bank = { items: out, byId: byId };

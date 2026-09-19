@@ -473,6 +473,9 @@
     var QU = root.GRA.quizUI;
     if (QU && QU.active()) { QU.render(host); return; }
     if (QU) host.appendChild(QU.hub());
+    /* the province's economy over time: what the data tells, and the
+       sourced longer story */
+    if (root.GRA.history) host.appendChild(root.GRA.history.card());
     var n = T.counts();
     var focus = A.state.learnFocus;
     A.state.learnFocus = null;
@@ -541,6 +544,93 @@
         if (el) try { el.scrollIntoView({ block: 'start' }); } catch (x) {}
       }, 60);
     }
+  };
+
+  /* ---------------------------------------------- panel readings
+
+     Every analysis card ends the same way: one sentence saying what the
+     result means for THIS place, in words, then the terms it used as chips.
+     The sentence says nothing the card's own numbers do not support - a
+     difference inside the sampling or rounding noise is said to be noise. */
+
+  L.teach = function (cardEl, ids, plainHTML) {
+    init();
+    if (!cardEl) return;
+    var box = document.createElement('div');
+    box.className = 'teach';
+    if (plainHTML) {
+      box.appendChild(Object.assign(document.createElement('p'),
+        { className: 'explain-plain teach-says', innerHTML: plainHTML }));
+    }
+    if (ids && ids.length) box.appendChild(L.chips(ids, { label: 'What these mean:' }));
+    cardEl.appendChild(box);
+  };
+
+  /* Structure: the industry most over-represented here, only where the
+     excess clears sampling error and the count is above the floor. */
+  L.readMix = function (rows, placeName, refLabel) {
+    init();
+    var best = null;
+    rows.forEach(function (r) {
+      if (r.lq == null || r.flag !== 'ok' || (r.employment || 0) < 50) return;
+      var expected = r.employment / r.lq;
+      if (r.lq < 1.25 || !M.clearlyLarger(r.employment, expected, 3)) return;
+      if (!best || r.lq > best.lq) best = r;
+    });
+    if (!best) {
+      return 'No industry in ' + esc(placeName) + ' is clearly more concentrated ' +
+        'than in ' + esc(refLabel) + ' once sampling error is allowed for. Its ' +
+        'mix of jobs looks broadly like the benchmark’s.';
+    }
+    var times = best.lq >= 1.95 ? (Math.round(best.lq * 10) / 10) + ' times'
+                                : 'about ' + Math.round((best.lq - 1) * 100) + '% more than';
+    return '<b>' + esc(D.naics[best.i].short) + '</b> stands out: its share of ' +
+      'jobs in ' + esc(placeName) + ' is ' + times + ' its share in ' +
+      esc(refLabel) + '. A concentration like that usually means the place ' +
+      'serves customers, patients or buyers from beyond its borders - money ' +
+      'coming in, which is why it matters for the local economy.';
+  };
+
+  /* Economic base, in tens. Withheld when the base is unstable. */
+  L.readBase = function (base, refLabel) {
+    init();
+    if (!base || base.unstable || base.basicShare == null) return null;
+    var tenths = Math.round(base.basicShare * 10);
+    if (tenths < 1) return null;
+    return 'Roughly <b>' + tenths + ' in 10</b> jobs here look like they bring ' +
+      'money in from outside, judged against ' + esc(refLabel) + '. The rest ' +
+      'mostly serve the people who live here. Treat it as a rough split, not a ' +
+      'count: the method tends to understate the export share.';
+  };
+
+  /* Shift-share, as a sentence. Components smaller than the rounding
+     uncertainty are called "too small to call", not given a sign. */
+  L.readShiftShare = function (t, ch, placeName, emView) {
+    init();
+    var noise = 2 * (ch.uncertainty || 0);
+    function part(v, up, down) {
+      if (v == null) return '';
+      if (Math.abs(v) <= noise) return 'made no difference we can measure';
+      return (v > 0 ? up : down) + ' about ' + C.fmt(Math.abs(Math.round(v)));
+    }
+    var comp = emView ? t.emCompetitive : t.competitive;
+    var s = 'If ' + esc(placeName) + ' had simply changed at ' +
+      esc(ch.ref.label) + '’s rate, its resident workforce would have ' +
+      (t.national >= 0 ? 'gained' : 'lost') + ' about ' +
+      C.fmt(Math.abs(Math.round(t.national))) + '. Its mix of industries ' +
+      part(t.mix, 'added', 'took away') + '. How its industries did against the ' +
+      'same industries elsewhere ' + part(comp, 'added', 'took away') + '.';
+    var verdict;
+    if (Math.abs(comp) <= noise && Math.abs(t.mix) <= noise) {
+      verdict = ' In short, it moved with the benchmark.';
+    } else if (Math.abs(comp) > Math.abs(t.mix)) {
+      verdict = ' The bigger story is local performance, not the industries it ' +
+        'started with.';
+    } else {
+      verdict = ' The bigger story is the industries it started with, not how ' +
+        'well it did in them.';
+    }
+    return s + verdict;
   };
 
   function attach() {

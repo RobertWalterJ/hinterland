@@ -34,7 +34,7 @@ globalThis.fetch = (u) => {
     json: () => Promise.resolve(JSON.parse(fs.readFileSync(f, 'utf8'))) });
 };
 const geval = eval;
-for (const f of ['methods.js', 'charts.js', 'data.js', 'terms.js',
+for (const f of ['methods.js', 'charts.js', 'data.js', 'terms.js', 'history.js',
                  'quiz-bank.js', 'quiz-sched.js']) {
   geval(fs.readFileSync(path.join(APP, 'js', f), 'utf8'));
 }
