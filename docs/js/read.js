@@ -232,6 +232,26 @@
     if (state !== 'idle') { state = 'idle'; emit(); }
   };
 
+  /* One thing, now: the speaker button beside a question, an option or a
+     sentence. Reads that element (its data-say if it has one) and nothing
+     after it. Pressing the same speaker again while it is speaking stops. */
+  R.one = function (node) {
+    if (!R.available() || !node) return false;
+    var again = state === 'reading' && queue.length === 1 && queue[0].node === node;
+    R.stop();
+    if (again) return false;
+    var text = node.hasAttribute('data-say') ? node.getAttribute('data-say') : node.textContent;
+    text = speakable(clean(text));
+    if (!text) return false;
+    queue = [{ text: text, node: node }];
+    idx = 0;
+    token++;
+    state = 'reading';
+    emit();
+    step(token);
+    return true;
+  };
+
   /* Play / pause on the same control; a long press is not discoverable, so
      Stop is always a separate button. */
   R.toggle = function (container) {

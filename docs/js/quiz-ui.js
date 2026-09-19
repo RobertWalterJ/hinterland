@@ -85,7 +85,7 @@
     if (!queue.length) return false;
     var before = S.ideas(st(), bank);
     run = { queue: queue, i: 0, phase: 'ask', conf: null, chosen: null,
-            asked: 0, right: 0, fresh: 0, learnedNow: 0,
+            asked: 0, right: 0, fresh: 0, learnedNow: 0, missed: [],
             startedLearned: Object.keys(st().learnedIds).length,
             startedCan: S.canAnswer(st()),
             openBefore: Object.keys(before).filter(function (k) { return before[k].open; }) };
@@ -109,7 +109,7 @@
 
   QU.stop = function () {
     stopReading();
-    if (run) {
+    if (run && run.phase !== 'done') {
       S.endSession(st(), Date.now());
       S.save(st());
       run.phase = 'done';
@@ -120,11 +120,33 @@
   QU.leave = function () { run = null; A.render(); };
   QU.phase = function () { return run ? run.phase : null; };
 
-  /* Commit the pending answer - only when Next is pressed, so "that was a
-     misread" can still withdraw it. */
+  /* The answer is committed the moment it is chosen - so a back gesture or
+     a closed tab cannot lose it (it used to wait for Next, and back then
+     reported "You answered 0 questions"). A snapshot is kept, so "that was
+     a misread" and the "were you sure?" tap can still undo or re-score it. */
+  function snapshot(it) {
+    var s = st();
+    return { item: s.items[it.id] ? JSON.parse(JSON.stringify(s.items[it.id])) : null,
+             learned: s.learnedIds[it.id] || null, seen: s.seen[it.id] || null,
+             asked: run.asked, right: run.right, fresh: run.fresh, learnedNow: run.learnedNow,
+             missed: run.missed.slice() };
+  }
+  function undo() {
+    var it = current(), u = run.undo;
+    if (!it || !u) return;
+    var s = st();
+    if (u.item) s.items[it.id] = u.item; else delete s.items[it.id];
+    if (u.learned) s.learnedIds[it.id] = u.learned; else delete s.learnedIds[it.id];
+    if (u.seen) s.seen[it.id] = u.seen; else delete s.seen[it.id];
+    run.asked = u.asked; run.right = u.right; run.fresh = u.fresh;
+    run.learnedNow = u.learnedNow; run.missed = u.missed;
+    run.undo = null;
+    S.save(s);
+  }
   function commit() {
     var it = current();
     if (!it || run.chosen == null) return;
+    run.undo = snapshot(it);
     var now = Date.now();
     var opt = it.options[run.chosen];
     var right = !!opt.correct;
@@ -137,13 +159,13 @@
          this is what fades the plain-English scaffolding (terms.js) */
       (it.terms || []).forEach(function (id) { T.record(id, 'held'); });
     }
-    run.asked++; if (right) run.right++;
+    run.asked++; if (right) run.right++; else run.missed.push(it.id);
     S.save(st());
   }
 
   function next() {
     stopReading();
-    commit();
+    run.undo = null;
     run.i++;
     run.phase = run.i >= run.queue.length ? 'done' : 'ask';
     run.conf = null; run.chosen = null;
@@ -248,10 +270,40 @@
 
   /* ------------------------------------------------------------ render */
 
+  /* ------------------------------------------------------------ render
+
+     The quiz is its own full screen (body.quiz-mode hides the analysis
+     header and the tab bar): a slim bar with back, progress and Stop, then
+     one question. Every block that speaks has its own speaker button, as in
+     Palimpsest - listening is how a dyslexic reader checks a word. */
+
+  var SPEAK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/>' +
+    '<path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+  function speaker(label) {
+    return '<button type="button" class="qspk" aria-label="Read ' + esc(label) + ' aloud">' +
+      SPEAK + '</button>';
+  }
+
+  function topBar(label) {
+    var n = run.queue.length, i = Math.min(run.i + 1, n);
+    return '<div class="qbar">' +
+      '<button type="button" class="qback" aria-label="Pause">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>' +
+      '<div class="qprog" role="progressbar" aria-valuemin="1" aria-valuemax="' + n +
+      '" aria-valuenow="' + i + '" aria-label="' + esc(label || ('Question ' + i + ' of ' + n)) + '">' +
+      '<i style="width:' + Math.round(100 * (run.phase === 'card' ? i : i - 1) / n) + '%"></i></div>' +
+      '<span class="qprog-t">' + esc(label || (i + ' of ' + n)) + '</span>' +
+      '<button type="button" class="linkbtn qstop">Stop</button></div>';
+  }
+
   QU.render = function (host) {
     init();
     host.classList.add('quiz-host');
+    document.body.classList.add('quiz-mode');
     if (run.phase === 'done') return renderDone(host);
+    if (run.phase === 'paused') return renderPaused(host);
     var it = current();
     if (!it) { run.phase = 'done'; return renderDone(host); }
     if (run.phase === 'lesson') return renderLesson(host, it);
@@ -259,80 +311,80 @@
     var wrap = document.createElement('div');
     wrap.className = 'quiz-wrap';
 
-    var top = '<div class="qtop"><span class="qcount">Question ' + (run.i + 1) +
-      ' of ' + run.queue.length + '</span>' +
-      '<button type="button" class="linkbtn qstop">Stop here</button></div>';
-
     var chip = it.chip.universe + (it.chip.when ? ' · ' + it.chip.when : '');
     var ask = '<div class="qask">' +
       '<p class="qchip" data-say="' + esc(chip.replace(' · ', ', ')) + '.">' +
       esc(chip) + '</p>' +
-      '<h2 class="qstem">' + esc(it.stem) + '</h2>' +
-      (it.prompt ? picture(it.prompt, true) : '') +
+      '<div class="qline"><h2 class="qstem">' + esc(it.stem) + '</h2>' +
+      speaker('the question') + '</div>' +
+      (run.phase === 'ask' && it.prompt ? picture(it.prompt, true) : '') +
       '</div>';
 
     if (run.phase === 'ask') {
-      var conf = '<div class="qconf" role="group" aria-label="How sure are you? Optional">' +
-        '<span class="qconf-l">How sure are you? (optional)</span>' +
-        [['sure', 'Sure'], ['think', 'Think so'], ['guess', 'Guessing']].map(function (c) {
-          return '<button type="button" class="qconf-b" data-conf="' + c[0] +
-            '" aria-pressed="' + (run.conf === c[0]) + '">' + c[1] + '</button>';
-        }).join('') + '</div>';
       var opts = '<div class="qopts">' + it.options.map(function (o, i) {
-        return '<button type="button" class="qopt" data-i="' + i + '" data-say="' +
-          esc(o.say) + '"><span class="qkey" aria-hidden="true">' + o.key +
-          '</span><span class="qlabel">' + esc(o.label) + '</span></button>';
+        return '<div class="qline"><button type="button" class="qopt" data-i="' + i +
+          '" data-say="' + esc(o.say) + '"><span class="qkey" aria-hidden="true">' + o.key +
+          '</span><span class="qlabel">' + esc(o.label) + '</span></button>' +
+          speaker('option ' + o.key) + '</div>';
       }).join('') + '</div>';
-      wrap.innerHTML = top + ask + conf + opts;
+      wrap.innerHTML = topBar() + ask + opts;
       host.appendChild(wrap);
       wireAsk(wrap, it);
+      wireSpeakers(wrap);
       autoRead(wrap.querySelector('.qask').parentNode);
       return;
     }
 
-    /* the card */
+    /* the answer: both marked rows say in WORDS what they are - a dashed
+       outline was the only sign of "your answer", and it read as unselected */
     var opt = it.options[run.chosen];
     var right = !!opt.correct;
     var correct = it.options.filter(function (o) { return o.correct; })[0];
     var marked = '<div class="qopts is-answered">' + it.options.map(function (o, i) {
-      var cls = o.correct ? ' is-right' : (i === run.chosen ? ' is-chosen' : '');
-      var mark = o.correct ? '<span class="qmark" aria-hidden="true">✓</span>'
-        : (i === run.chosen ? '<span class="qmark" aria-hidden="true">✕</span>' : '');
+      var mine = i === run.chosen;
+      var cls = (o.correct ? ' is-right' : '') + (mine ? ' is-chosen' : '');
+      var tag = o.correct && mine ? '✓ Your answer, right'
+        : o.correct ? '✓ Right answer' : mine ? '✕ Your answer' : '';
       return '<div class="qopt' + cls + '"><span class="qkey" aria-hidden="true">' +
-        o.key + '</span><span class="qlabel">' + esc(o.label) + '</span>' + mark + '</div>';
+        o.key + '</span><span class="qlabel">' + esc(o.label) +
+        (tag ? '<span class="qtag">' + tag + '</span>' : '') + '</span></div>';
     }).join('') + '</div>';
 
-    var verdict = right ? 'Right.'
-      : 'Not this time — it’s ' + correct.label + '.';
-    var more = '';
-    if (it.card.more || (it.terms && it.terms.length) || it.place) {
-      more = '<details class="qmore"><summary>Tell me more</summary>' +
-        (it.card.more ? '<p class="qmore-p">' + esc(it.card.more) + '</p>' : '') +
-        (!right ? '<p class="qmore-p">You chose ' + esc(opt.label) + '.</p>' : '') +
-        '<div class="qterms"></div>' +
-        (it.place ? '<button type="button" class="linkbtn qshow">Show me ' +
-          esc(D.byCode[it.place] ? D.byCode[it.place].name : '') + ' in full</button>' : '') +
-        '</details>';
-    }
+    var verdict = right ? 'Right: ' + correct.label + '.'
+      : 'You chose ' + opt.label + '. The answer is ' + correct.label + '.';
+    var moreBits = (it.card.more ? '<p class="qmore-p">' + esc(it.card.more) + '</p>' : '') +
+      (it.idea && I ? '<p class="qpart">Part of the big idea <b>' +
+        esc(I.byId[it.idea].title) + '</b></p>' : '') +
+      '<div class="qterms"></div>' +
+      (it.place ? '<button type="button" class="linkbtn qshow">Show me ' +
+        esc(D.byCode[it.place] ? D.byCode[it.place].name : '') + ' in full</button>' : '') +
+      '<p class="qsource">' + esc(sourceLine(it)) + '</p>' +
+      '<button type="button" class="linkbtn qmisread">That was a misread: ask me again</button>';
+    var conf = '<div class="qconf" role="group" aria-label="Were you sure? Optional">' +
+      '<span class="qconf-l">Were you sure? (optional)</span>' +
+      [['sure', 'Sure'], ['think', 'Think so'], ['guess', 'Guessed']].map(function (c) {
+        return '<button type="button" class="qconf-b" data-conf="' + c[0] +
+          '" aria-pressed="' + (run.conf === c[0]) + '">' + c[1] + '</button>';
+      }).join('') + '</div>';
     var card = '<div class="qcard" role="status">' +
-      '<p class="qverdict ' + (right ? 'is-right' : 'is-wrong') + '">' +
+      '<div class="qline"><p class="qverdict ' + (right ? 'is-right' : 'is-wrong') + '">' +
       '<span class="qvicon" aria-hidden="true">' + (right ? '✓' : '✕') + '</span>' +
-      esc(verdict) + '</p>' +
+      '<span>' + esc(verdict) + '</span></p>' + speaker('the answer') + '</div>' +
       '<p class="qsentence">' + esc(it.card.sentence) + '</p>' +
       picture(it.card.picture, false) +
-      /* Next sits in the flow, straight after the answer - never a bar
-         fixed over the page, which covered the card's own text */
+      conf +
+      '<details class="qmore"><summary>More about this answer</summary>' + moreBits +
+      '</details>' +
+      /* Next is the LAST thing, in the flow: never a bar pinned over the
+         card (which covered its text), and never above the card's own
+         details (which then went unseen) */
       '<div class="qnextbar"><button type="button" class="btn btn-primary qnext">' +
       (run.i + 1 >= run.queue.length ? 'Finish' : 'Next') + '</button></div>' +
-      (it.idea && I ? '<p class="qpart">Part of <b>' + esc(I.byId[it.idea].title) +
-        '</b></p>' : '') +
-      '<p class="qsource">' + esc(sourceLine(it)) + '</p>' +
-      more +
-      '<button type="button" class="linkbtn qmisread">That was a misread — ask me again</button>' +
       '</div>';
-    wrap.innerHTML = top + ask.replace(picture(it.prompt, true), '') + marked + card;
+    wrap.innerHTML = topBar() + ask + marked + card;
     host.appendChild(wrap);
     wireCard(wrap, it);
+    wireSpeakers(wrap);
     autoRead(wrap.querySelector('.qcard'));
   };
 
@@ -341,25 +393,34 @@
     setTimeout(function () { R.start(node); }, 60);
   }
 
+  /* each speaker reads the element it sits beside */
+  function wireSpeakers(wrap) {
+    Array.prototype.forEach.call(wrap.querySelectorAll('.qspk'), function (b) {
+      b.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (!R) return;
+        var line = b.closest('.qline, li');
+        var target = line && (line.querySelector('[data-say], .qstem, .qverdict, .qlesson-p') || line);
+        if (line && line.tagName === 'LI') target = line.querySelector('.qlesson-p') || line;
+        R.one(target);
+      });
+    });
+  }
+
   function wireCommon(wrap) {
-    wrap.querySelector('.qstop').addEventListener('click', QU.stop);
+    var s = wrap.querySelector('.qstop');
+    if (s) s.addEventListener('click', QU.stop);
+    var b = wrap.querySelector('.qback');
+    if (b) b.addEventListener('click', QU.pause);
   }
 
   function wireAsk(wrap, it) {
     wireCommon(wrap);
-    wrap.querySelectorAll('.qconf-b').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var c = b.getAttribute('data-conf');
-        run.conf = run.conf === c ? null : c;
-        wrap.querySelectorAll('.qconf-b').forEach(function (x) {
-          x.setAttribute('aria-pressed', String(x.getAttribute('data-conf') === run.conf));
-        });
-      });
-    });
     wrap.querySelectorAll('.qopt').forEach(function (b) {
       b.addEventListener('click', function () {
         stopReading();
         run.chosen = +b.getAttribute('data-i');
+        commit();                       /* counted now, so back can't lose it */
         run.phase = 'card';
         run.cardAt = Date.now();
         A.render();
@@ -376,8 +437,20 @@
     });
     wrap.querySelector('.qmisread').addEventListener('click', function () {
       stopReading();
+      undo();
       run.chosen = null; run.phase = 'ask';
       A.render();
+    });
+    wrap.querySelectorAll('.qconf-b').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var c = b.getAttribute('data-conf');
+        run.conf = run.conf === c ? null : c;
+        /* re-score the same answer with the confidence given */
+        undo(); commit();
+        wrap.querySelectorAll('.qconf-b').forEach(function (x) {
+          x.setAttribute('aria-pressed', String(x.getAttribute('data-conf') === run.conf));
+        });
+      });
     });
     var terms = wrap.querySelector('.qterms');
     if (terms && it.terms && it.terms.length && root.GRA.learn) {
@@ -388,9 +461,37 @@
       stopReading();
       var tab = SHOW_TAB[it.form] || 'overview';
       run = null;
+      document.body.classList.remove('quiz-mode');
       A.setPlace(it.place);
       A.go(tab);
     });
+  }
+
+  /* ------------------------------------------------------------ paused */
+
+  QU.pause = function () {
+    if (!run || run.phase === 'done') return;
+    stopReading();
+    if (run.phase !== 'paused') { run.resumeTo = run.phase; run.phase = 'paused'; }
+    A.render();
+  };
+
+  function renderPaused(host) {
+    var wrap = document.createElement('div');
+    wrap.className = 'quiz-wrap';
+    var n = run.queue.length;
+    wrap.innerHTML = topBar('Paused') +
+      '<div class="qpaused"><h2 class="qlesson-t">Paused at question ' +
+      Math.min(run.i + 1, n) + ' of ' + n + '</h2>' +
+      '<p class="qlesson-ask">Everything you have answered is saved.</p>' +
+      '<div class="qnextbar"><button type="button" class="btn btn-primary qresume">Carry on</button></div>' +
+      '<div class="qnextbar"><button type="button" class="btn qend">End this session</button></div></div>';
+    host.appendChild(wrap);
+    wireCommon(wrap);
+    wrap.querySelector('.qresume').addEventListener('click', function () {
+      run.phase = run.resumeTo || 'ask'; A.render();
+    });
+    wrap.querySelector('.qend').addEventListener('click', QU.stop);
   }
 
   /* ------------------------------------------------------------ lesson */
@@ -400,21 +501,22 @@
     var pts = I.lesson(it.idea);
     var wrap = document.createElement('div');
     wrap.className = 'quiz-wrap';
-    wrap.innerHTML =
-      '<div class="qtop"><span class="qcount">A new big idea</span>' +
-      '<button type="button" class="linkbtn qstop">Stop here</button></div>' +
+    wrap.innerHTML = topBar('New big idea') +
       '<div class="qlesson">' +
       '<p class="qlesson-n">Big idea ' + idea.n + ' of ' + I.IDEAS.length + '</p>' +
-      '<h2 class="qlesson-t">' + esc(idea.title) + '</h2>' +
+      '<div class="qline"><h2 class="qlesson-t">' + esc(idea.title) + '</h2>' +
+      speaker('the title') + '</div>' +
       '<p class="qlesson-ask">' + esc(idea.ask) + '</p>' +
       '<ul class="qlesson-pts">' + pts.map(function (p) {
-        return '<li>' + p + '</li>'; }).join('') + '</ul>' +
+        return '<li class="qline"><span class="qlesson-p">' + p + '</span>' +
+          speaker('this point') + '</li>'; }).join('') + '</ul>' +
       '<p class="qlesson-note">The next questions test this, then go further.</p>' +
       '</div>' +
       '<div class="qnextbar"><button type="button" class="btn btn-primary qgo">' +
       'Got it, ask me</button></div>';
     host.appendChild(wrap);
     wireCommon(wrap);
+    wireSpeakers(wrap);
     var shownAt = Date.now();
     wrap.querySelector('.qgo').addEventListener('click', function () {
       if (Date.now() - shownAt < 600) return;          /* debounce, not a timer */
@@ -447,20 +549,25 @@
       (up > 0 ? ', <b>up ' + up + '</b> this session' : '') + '</div></div>' +
       (run.learnedNow ? '<p class="explain-plain">' + run.learnedNow + ' held from a week ' +
         'or more ago, so they now count as learned for good.</p>' : '') +
+      (run.missed.length ? '<h3 class="subh" style="margin-top:14px">Look again at</h3>' +
+        '<ul class="qidea-facts">' + run.missed.slice(0, 3).map(function (id) {
+          var it = bank.byId[id];
+          return it ? '<li>' + esc(it.card.sentence) + '</li>' : '';
+        }).join('') + '</ul><p class="card-foot">These come back on another day.</p>' : '') +
       opened.map(function (k) {
         return '<p class="qopened">New big idea opened: <b>' + esc(status[k].title) +
           '</b>.' + (st().lessons[k] ? '' : ' Its short lesson comes first next time.') +
           '</p>';
       }).join('') +
-      '<div class="ctlrow"><button type="button" class="btn btn-primary qagain">' +
-      'Another session</button><button type="button" class="btn qback">See your progress' +
-      '</button></div></div>'));
+      '<div class="qnextbar"><button type="button" class="btn btn-primary qdone">Done' +
+      '</button></div><div class="qnextbar"><button type="button" class="btn qagain">' +
+      'Another session</button></div></div>'));
     host.appendChild(c);
     c.querySelector('.qagain').addEventListener('click', function () {
       run = null;
       if (!QU.start()) { A.render(); }
     });
-    c.querySelector('.qback').addEventListener('click', QU.leave);
+    c.querySelector('.qdone').addEventListener('click', QU.leave);
   }
 
   /* ------------------------------------------------------------ hub

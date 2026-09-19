@@ -345,13 +345,19 @@
   D.referencePeriod = function (kind, place, y0, y1, opt) {
     opt = opt || {};
     var peers = opt.peerCodes || [];
+    /* opt.years: balance across ALL these years, not just y0 and y1 - a
+       chained decomposition otherwise puts changes in membership into
+       "reference growth" */
+    var yrs = opt.years || [y0, y1];
 
     if (kind === 'ON' || kind === 'CA') {
       var code = kind === 'ON' ? '35' : 'CA';
       var a = D.resVec(code, y0), b = D.resVec(code, y1);
       if (!a || !b) return null;
+      var ser = {};
+      yrs.forEach(function (y) { var v = D.resVec(code, y); if (v) ser[y] = v; });
       return {
-        v0: a, v1: b, label: kind === 'ON' ? 'Ontario' : 'Canada',
+        v0: a, v1: b, label: kind === 'ON' ? 'Ontario' : 'Canada', series: ser,
         published: true, coverage: 1,
         note: 'Published Statistics Canada figures for both years.'
       };
@@ -363,19 +369,23 @@
     if (!codes.length) return null;
 
     var balanced = codes.filter(function (c) {
-      return D.hasRes(c, y0) && D.hasRes(c, y1);
+      return yrs.every(function (y) { return D.hasRes(c, y); });
     });
     if (!balanced.length) return null;
 
     var A = D.aggregate(balanced, function (c) { return D.resVec(c, y0); });
     var B = D.aggregate(balanced, function (c) { return D.resVec(c, y1); });
+    var series = {};
+    yrs.forEach(function (y) {
+      series[y] = D.aggregate(balanced, function (c) { return D.resVec(c, y); }).vec;
+    });
     var label = kind === 'PEERS'
       ? 'peer group (' + balanced.length + ' municipalities)'
       : ({ CD: D.geo.cd_names[place.cd], ER: D.geo.er_names[place.er],
            CMA: D.geo.cma_names[place.cma] })[kind] || kind;
 
     return {
-      v0: A.vec, v1: B.vec, label: label, published: false,
+      v0: A.vec, v1: B.vec, label: label, published: false, series: series,
       coverage: balanced.length / codes.length,
       contributors: balanced.length, expected: codes.length,
       note: balanced.length === codes.length
@@ -385,6 +395,32 @@
            '. Holding the set fixed keeps the reference growth rate honest; ' +
            'the excluded municipalities are listed in the export.')
     };
+  };
+
+  /* A place's residence-basis vectors over several years, on a BALANCED
+     panel: for a division, region or metro area, only the member
+     municipalities published in every one of the years are summed. Summing
+     whoever was published each year counted towns appearing in the data as
+     growth - Kenora's 2001-2021 change read -4.1% instead of -13.7%. */
+  D.resSeries = function (place, years) {
+    var out = { vecs: {}, used: null, members: null };
+    if (place.level === 'CSD' || place.level === 'PR' || place.level === 'CA') {
+      years.forEach(function (y) {
+        var v = D.resVec(place.code, y);
+        if (v) out.vecs[y] = v;
+      });
+      return out;
+    }
+    var mem = D.membersOf(place.level, place);
+    var keep = mem.filter(function (c) {
+      return years.every(function (y) { return D.hasRes(c, y); });
+    });
+    out.members = mem.length; out.used = keep.length;
+    if (!keep.length) return out;
+    years.forEach(function (y) {
+      out.vecs[y] = D.aggregate(keep, function (c) { return D.resVec(c, y); }).vec;
+    });
+    return out;
   };
 
   /* ---------------------------------------------- neighbourhood helpers */
@@ -416,6 +452,44 @@
      says which one, because a municipality is not its census division. */
   D.componentsFor = function (place) {
     if (!D.components) return null;
+    /* An economic region is made of whole census divisions, and Ontario of
+       all of them, so their components are SUMS of division components -
+       exact, because every component is a count. (Moves between divisions
+       inside a region cancel in the sum, which is what "net migration within
+       Ontario" should mean for the region.) Metro areas cut across divisions
+       and get none. */
+    if (place.level === 'ER' || place.level === 'PR') {
+      var cds = {};
+      if (place.level === 'PR') {
+        Object.keys(D.components.data).forEach(function (v) {
+          Object.keys(D.components.data[v]).forEach(function (c) { cds[c] = 1; });
+        });
+      } else {
+        D.membersOf('ER', place).forEach(function (c) {
+          var q = D.byCode[c]; if (q && q.cd) cds[q.cd] = 1;
+        });
+      }
+      var list = Object.keys(cds);
+      if (!list.length) return null;
+      var sum = { cd: null, cdName: place.name.split(' / ')[0], summed: list.length,
+                  series: {} };
+      Object.keys(D.components.data).forEach(function (v) {
+        var acc = null;
+        list.forEach(function (c) {
+          var byYear = D.components.data[v][c];
+          if (!byYear) return;
+          acc = acc || {};
+          Object.keys(byYear).forEach(function (y) {
+            var dst = acc[y] = acc[y] || {};
+            Object.keys(byYear[y]).forEach(function (k) {
+              dst[k] = (dst[k] || 0) + (byYear[y][k] || 0);
+            });
+          });
+        });
+        if (acc) sum.series[v] = acc;
+      });
+      return Object.keys(sum.series).length ? sum : null;
+    }
     var cd = place.level === 'CD' ? place.code : place.cd;
     if (!cd) return null;
     var out = { cd: cd, cdName: D.geo.cd_names[cd] || cd, series: {} };
@@ -423,6 +497,24 @@
       if (D.components.data[v][cd]) out.series[v] = D.components.data[v][cd];
     });
     return Object.keys(out.series).length ? out : null;
+  };
+
+  /* Annual population for any place: published for municipalities, Ontario
+     and Canada; SUMMED from municipalities (on 2021 boundaries, so exact)
+     for divisions, regions and metro areas, which had no line at all. */
+  D.popSeries = function (place) {
+    if (!D.pop || !D.pop.data) return null;
+    if (D.pop.data[place.code]) return D.pop.data[place.code];
+    var mem = D.membersOf(place.level, place);
+    if (!mem.length) return null;
+    var out = {}, n = 0;
+    mem.forEach(function (c) {
+      var s = D.pop.data[c];
+      if (!s) return;
+      n++;
+      Object.keys(s).forEach(function (y) { out[y] = (out[y] || 0) + (s[y] || 0); });
+    });
+    return n ? out : null;
   };
 
   /* ------------------------------------------------------- occupation */
@@ -517,7 +609,19 @@
       if (n.indexOf(q) === 0) starts.push(p);
       else if (n.indexOf(q) > 0 || p.code.indexOf(q) === 0) has.push(p);
     });
-    starts.sort(bySize); has.sort(bySize);
+    /* Municipalities first - they are the "here" of the question - and an
+       exact name before anything that merely starts with it. Typing "ham"
+       used to list the Hamilton region, metro area and division before the
+       City of Hamilton. */
+    var rank = function (a, b) {
+      var ea = a.name.split(' / ')[0].toLowerCase() === q ? 0 : 1;
+      var eb = b.name.split(' / ')[0].toLowerCase() === q ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      var ca = a.level === 'CSD' ? 0 : 1, cb = b.level === 'CSD' ? 0 : 1;
+      if (ca !== cb) return ca - cb;
+      return bySize(a, b);
+    };
+    starts.sort(rank); has.sort(rank);
     return starts.concat(has).slice(0, 80);
   };
 

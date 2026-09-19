@@ -280,7 +280,7 @@
       }
     }
     var c = U.card(null, null, { className: 'chg-answer' });
-    c.innerHTML = '<h2 class="screen-q">Is it growing?</h2>' + (lines.length
+    c.innerHTML = (lines.length
       ? lines.map(function (l) { return '<p class="answer-p">' + l + '</p>'; }).join('')
       : '<p class="answer-p">Statistics Canada publishes no population series for this place.</p>');
     return c;

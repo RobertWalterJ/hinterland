@@ -46,17 +46,31 @@
 
   var TABS = [
     { id: 'overview', label: 'Home' },
-    { id: 'structure', label: 'Structure' },
+    { id: 'structure', label: 'Known for' },
     { id: 'change', label: 'Change' },
-    { id: 'peers', label: 'Peers' },
-    { id: 'population', label: 'Population' },
-    { id: 'impact', label: 'Impact' },
+    { id: 'population', label: 'Growth' },
+    { id: 'peers', label: 'Compare' },
+    { id: 'impact', label: 'If jobs arrived' },
     { id: 'hoods', label: 'Neighbourhoods' },
     { id: 'map', label: 'Map' },
     { id: 'brief', label: 'Brief' },
     { id: 'learn', label: 'Learn' },
     { id: 'sources', label: 'Sources' }
   ];
+
+  /* The phone has four destinations. Every other screen is a step down
+     from Home, and Home stays lit while you are there - an unlit bar on
+     Structure or Peers left Robert not knowing where he was. */
+  var SECTION = { overview: 'overview', structure: 'overview', change: 'overview',
+    population: 'overview', impact: 'overview', hoods: 'overview', brief: 'overview',
+    sources: 'overview', peers: 'peers', map: 'map', learn: 'learn' };
+  A.SECTION = SECTION;
+  /* The question each step-down screen answers: its title bar says it. */
+  var TITLES = { structure: 'What is it known for?', change: 'How has work changed?',
+    population: 'Is it growing?', impact: 'What if new jobs arrived?',
+    hoods: 'How do its neighbourhoods differ?', brief: 'The brief',
+    sources: 'Where the numbers come from' };
+  A.TITLES = TITLES;
   A.TABS = TABS;
 
   /* ------------------------------------------------------------- booting */
@@ -163,6 +177,11 @@
       var hash = '#' + h.toString();
       var moved = navKey(hash) !== navKey(lastHash);
       if (histReady && moved && !fromPop) {
+        var m0 = document.querySelector('main');
+        try {
+          history.replaceState(Object.assign({}, history.state || {},
+            { scroll: m0 ? m0.scrollTop : 0 }), '', lastHash);
+        } catch (x) {}
         history.pushState({ hl: 'nav' }, '', hash);
       } else {
         history.replaceState(history.state, '', hash);
@@ -231,6 +250,13 @@
         if (t && A.state.tab !== t) { A.state.tab = t; A.render(); }
       } finally { fromPop = false; }
       lastHash = location.hash;
+      /* back to where you were on that screen, once it has drawn */
+      var want = e.state && e.state.scroll;
+      if (want) {
+        /* a timer, not animation frames: charts lay out after a tick, and a
+           hidden page never paints */
+        setTimeout(function () { jump(want); }, 60);
+      }
     });
   }
 
@@ -281,10 +307,9 @@
     document.getElementById('nav').addEventListener('click', function (e) {
       var b = e.target.closest('[data-tab]');
       if (!b) return;
-      var t = b.getAttribute('data-tab');
-      if (t === 'place') { A.openPlacePicker(); return; }
-      A.go(t);
+      A.go(b.getAttribute('data-tab'));
     });
+    document.getElementById('menuBtn').addEventListener('click', A.openMenu);
 
     document.getElementById('placeChip')
       .addEventListener('click', A.openPlacePicker);
@@ -326,10 +351,21 @@
     A.render();
   }
 
+  /* main has scroll-behavior: smooth, so a plain scrollTop animates - a
+     new screen must simply start at the top, and a returning one at its
+     old place, at once */
+  function jump(top) {
+    var m = document.querySelector('main');
+    if (!m) return;
+    try { m.scrollTo({ top: top || 0, behavior: 'instant' }); }
+    catch (e) { m.scrollTop = top || 0; }
+  }
+  A.jump = jump;
+
   A.go = function (tab) {
     A.state.tab = tab;
     A.render();
-    document.querySelector('main').scrollTop = 0;
+    jump(0);
   };
 
   A.setPlace = function (code) {
@@ -367,8 +403,7 @@
     }
     A.render();
     /* a new place starts at the top of its answer, wherever it was chosen */
-    var mainEl = document.querySelector('main');
-    if (mainEl) mainEl.scrollTop = 0;
+    jump(0);
   };
 
   A.setBenchmark = function (id) {
@@ -724,6 +759,7 @@
     document.body.classList.remove('is-landing');
     document.body.classList.remove('quiz-mode');
     try {
+      if (TITLES[tab] && tab !== 'overview') host.appendChild(titleBar(tab, ctx));
       fn(host, ctx, phone);
       if (phone && root.GRA.ui.foldLong) root.GRA.ui.foldLong(host);
     } catch (e) {
@@ -741,6 +777,68 @@
         }).join('');
       host.appendChild(w);
     }
+  };
+
+  /* "‹ Thunder Bay   How has work changed?" - where you are, and the way
+     back, on every step-down screen. The benchmark lives here too on the
+     screens that use it, instead of in the header of every screen. */
+  function titleBar(tab, ctx) {
+    var bar = document.createElement('div');
+    bar.className = 'titlebar';
+    var name = ctx.place.level === 'CT' ? D.tractLabel(ctx.place.code).title : ctx.place.name;
+    var usesRef = tab === 'structure' || tab === 'change';
+    bar.innerHTML = '<button type="button" class="tb-back" aria-label="Back to ' +
+      C.esc(name.split(' / ')[0]) + '">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>' +
+      '<span>' + C.esc(name.split(' / ')[0]) + '</span></button>' +
+      '<h1 class="tb-title">' + C.esc(TITLES[tab]) + '</h1>' +
+      (usesRef ? '<button type="button" class="tb-ref">Compared with ' +
+        C.esc(ctx.ref ? ctx.ref.label : 'Ontario') + ' \u25be</button>' : '');
+    bar.querySelector('.tb-back').addEventListener('click', A.back);
+    var r = bar.querySelector('.tb-ref');
+    if (r) r.addEventListener('click', A.openBenchmarkPicker);
+    return bar;
+  }
+
+  /* Back, as the on-screen chevron: the same as the phone's gesture when
+     there is history to go back through, otherwise up to Home. */
+  A.back = function () {
+    if (histReady && history.state && history.state.hl === 'nav' && history.length > 2) {
+      history.back();
+    } else {
+      A.go('overview');
+    }
+  };
+
+  /* The header's "More" sheet: the things every screen used to carry. */
+  A.openMenu = function () {
+    var snd = root.GRA.sound;
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+      (!document.documentElement.getAttribute('data-theme') &&
+       window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var el = sheet('More',
+      '<div class="sheet-body"><div class="menu">' +
+      '<button type="button" class="menu-i" data-m="bench">Compared with: <b>' +
+      C.esc(A.ctx && A.ctx.ref ? A.ctx.ref.label : 'Ontario') + '</b></button>' +
+      '<button type="button" class="menu-i" data-m="theme">' +
+      (dark ? 'Switch to light' : 'Switch to dark') + '</button>' +
+      '<button type="button" class="menu-i" data-m="sound">Sound: <b>' +
+      (snd && snd.enabled ? 'on' : 'off') + '</b></button>' +
+      '<button type="button" class="menu-i" data-m="export">Share or save these figures</button>' +
+      '<button type="button" class="menu-i" data-m="sources">Where the numbers come from</button>' +
+      '</div></div>');
+    el.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-m]');
+      if (!b) return;
+      var m = b.getAttribute('data-m');
+      closeSheet();
+      if (m === 'bench') A.openBenchmarkPicker();
+      else if (m === 'theme') toggleTheme();
+      else if (m === 'sound') document.getElementById('soundBtn').click();
+      else if (m === 'export') root.GRA.exportUI.open(A.ctx);
+      else if (m === 'sources') A.go('sources');
+    });
   };
 
   function renderChips(ctx) {
@@ -777,14 +875,10 @@
     Array.prototype.forEach.call(document.querySelectorAll('#nav button'),
       function (b) {
         var t = b.getAttribute('data-tab');
-        b.setAttribute('aria-selected', String(t === A.state.tab));
-        /* The phone nav is the only navigation on a phone, and it was offering
-           every tab for every place: tapping Change on a neighbourhood landed
-           on an error with no way back but the nav itself. */
-        var off = (t === 'change' && !avail.change) ||
-                  (t === 'population' && !avail.population);
-        b.hidden = !!off;
+        b.setAttribute('aria-selected', String(t === (SECTION[A.state.tab] || A.state.tab)));
+        b.hidden = t === 'peers' && !avail.peers;
       });
+    document.body.setAttribute('data-screen', A.state.tab);
   }
 
   /* ====================================================== the pickers */
@@ -935,8 +1029,10 @@
   A.subtitleFor = subtitleFor;
 
   function shortKind(p) {
-    return { CSD: D.CSD_TYPE[p.csd_type] || 'Mun.', CD: 'CD', ER: 'ER',
-             CMA: 'CMA/CA', CT: 'Tract', PR: 'Prov.', CA: 'Canada' }[p.level] || p.level;
+    /* words, not codes: "ER" and "CMA/CA" meant nothing to a reader */
+    return { CSD: D.CSD_TYPE[p.csd_type] || 'Municipality', CD: 'County or district',
+             ER: 'Region', CMA: 'Metro area', CT: 'Neighbourhood', PR: 'Province',
+             CA: 'Canada' }[p.level] || p.level;
   }
   A.shortKind = shortKind;
 

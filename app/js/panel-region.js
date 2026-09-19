@@ -306,10 +306,17 @@
               'its own commuting to stand alone.</div>'
             : '<div class="gloss">On commuting evidence ' +
               C.esc(ctx.place.name) + ' is not a free-standing labour market. ' +
-              'It groups with ' + C.esc(area.members.filter(function (m) {
-                return m !== ctx.place.code;
-              }).map(nameOf).slice(0, 6).join(', ')) +
-              (area.members.length > 7 ? ' and others' : '') +
+              'It groups with ' + (function () {
+                /* names only: a code (1103025) is not a place a reader knows.
+                   Places outside Ontario, or with no name in the data, are
+                   counted instead of printed */
+                var others = area.members.filter(function (m) { return m !== ctx.place.code; });
+                var named = others.filter(function (m) { return D.byCode[m] && D.byCode[m].name; });
+                var rest = others.length - Math.min(named.length, 6);
+                return C.esc(named.slice(0, 6).map(nameOf).join(', ')) +
+                  (rest > 0 ? (named.length ? ' and ' : '') + rest + ' other place' +
+                    (rest === 1 ? '' : 's') : '');
+              }()) +
               '. Housing, transport and employment-land decisions in any one ' +
               'of these places land on all of them.</div>');
 

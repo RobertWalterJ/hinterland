@@ -100,7 +100,7 @@
     --surface-1: #1a1a19;
     --surface-2: #201f1e;
     --surface-sunk: #0d0d0c;
-    --ink-1: #ffffff;
+    --ink-1: #ece9e1;
     --ink-2: #c3c2b7;
     --ink-3: #928f85;
     --line: #2e2e2b;
@@ -144,7 +144,7 @@
   --surface-1: #1a1a19;
   --surface-2: #201f1e;
   --surface-sunk: #0d0d0c;
-  --ink-1: #ffffff;
+  --ink-1: #ece9e1;
   --ink-2: #c3c2b7;
   --ink-3: #928f85;
   --line: #2e2e2b;
@@ -1110,9 +1110,12 @@ button.qopt:hover { border-color: var(--ink-3); background: var(--surface-2); }
 }
 .qlabel { flex: 1; }
 .qmark { flex: none; font-size: 20px; font-weight: 700; color: var(--ink-1); }
-.qopts.is-answered .qopt { cursor: default; opacity: .72; }
-.qopts.is-answered .qopt.is-right { opacity: 1; border-color: var(--ink-1); border-width: 2.5px; }
-.qopts.is-answered .qopt.is-chosen { opacity: 1; border-style: dashed; }
+.qopts.is-answered .qopt { cursor: default; opacity: .6; }
+.qopts.is-answered .qopt.is-right { opacity: 1; border-color: var(--ink-1); border-width: 2.5px;
+  background: var(--brand-wash); }
+.qopts.is-answered .qopt.is-chosen { opacity: 1; border-color: var(--ink-1); border-width: 2px; }
+.qtag { display: table; margin-top: 6px; font-size: 14px; font-weight: 700; padding: 2px 10px;
+  border-radius: 999px; border: 1.5px solid currentColor; white-space: nowrap; }
 
 .qcard { margin-top: 18px; padding: 16px 18px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
 .qverdict { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 19px; font-weight: 700; }
@@ -1325,3 +1328,116 @@ body.is-landing .chipset, body.is-landing #exportBtn { display: none; }
 .qsettings { margin-top: 16px; }
 .qsettings > summary { font-size: 15px; font-weight: 600; cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 @media (max-width: 720px) { .qidea-body { padding-left: 14px; } }
+
+
+/* hidden means hidden: .iconbtn{display:grid} was un-hiding the stop button */
+[hidden] { display: none !important; }
+
+/* ---------------------------------------------- quiz: its own screen */
+body.quiz-mode .topbar, body.quiz-mode #nav, body.quiz-mode .tabs { display: none; }
+body.quiz-mode main { padding-bottom: 24px; }
+.qbar { display: grid; grid-template-columns: 48px 1fr auto auto; align-items: center; gap: 10px;
+  margin: 0 0 16px; }
+.qback { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface-1); color: var(--ink-1); display: grid; place-items: center; cursor: pointer; }
+.qback svg { width: 22px; height: 22px; }
+.qprog { height: 8px; border-radius: 4px; background: var(--surface-sunk); overflow: hidden; }
+.qprog i { display: block; height: 100%; background: var(--ink-2); border-radius: 4px; }
+.qprog-t { font-size: 15px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qbar .qstop { min-height: 48px; font-size: 16px; }
+.qline { display: flex; align-items: flex-start; gap: 10px; }
+.qline > .qopt, .qline > .qstem, .qline > .qverdict, .qline > .qlesson-t, .qline > .qlesson-p { flex: 1; min-width: 0; }
+.qspk { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink-1); display: grid; place-items: center; cursor: pointer; }
+.qspk svg { width: 20px; height: 20px; }
+.qopts .qline { align-items: center; }
+.qlesson-pts li.qline { list-style: none; margin-left: -1.1em; }
+.qlesson-pts li.qline .qlesson-p::before { content: '• '; }
+.qconf { margin: 12px 0 4px; }
+.qpaused { padding-top: 12px; }
+.quiz-wrap .qnextbar .btn { width: 100%; min-height: 54px; font-size: 17px; justify-content: center; }
+.qverdict span:last-child { line-height: 1.35; }
+
+/* ---------------------------------------------- answer-first screens */
+.eyebrow-s { font-size: 14px; color: var(--ink-2); margin: 0 0 6px; }
+.screen-q { font-family: var(--display); font-size: 26px; line-height: 1.2; margin: 0 0 12px; }
+.answer-p { font-size: 18px; line-height: 1.55; margin: 0 0 12px; max-width: 36em; }
+.answer-p:last-child { margin-bottom: 0; }
+.chart-says { font-size: 16px; line-height: 1.5; color: var(--ink-1); margin: 10px 0 0; }
+
+/* change over time */
+.chg-host { width: 100%; }
+.chg-chart { display: block; overflow: visible; }
+.chg-grid { stroke: var(--line); stroke-width: 1; }
+.chg-base { stroke: var(--line-strong); stroke-width: 1.5; }
+.chg-seam { stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chg-ax { font-size: 13px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+.chg-line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.chg-line.is-me { stroke: var(--gain); }
+.chg-line.is-on { stroke: var(--ink-3); stroke-width: 2.2; }
+.chg-dot.is-me { fill: var(--gain); stroke: var(--surface-1); stroke-width: 2; }
+.chg-dot.is-on { fill: var(--ink-3); stroke: var(--surface-1); stroke-width: 2; }
+.chg-dot.is-hollow { fill: var(--surface-1); stroke-width: 2.5; }
+.chg-dot.is-me.is-hollow { stroke: var(--gain); }
+.chg-dot.is-on.is-hollow { stroke: var(--ink-3); }
+.chg-lab { font-size: 14px; font-weight: 650; }
+.chg-lab.is-me { fill: var(--ink-1); }
+.chg-lab.is-on { fill: var(--ink-2); }
+.chg-rows { display: grid; gap: 4px; }
+.chg-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas:
+  "name spark ends" "word word word"; align-items: center; gap: 2px 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--line); }
+.chg-row:last-child { border-bottom: 0; }
+.chg-name { grid-area: name; font-size: 16.5px; font-weight: 600; }
+.chg-row > svg { grid-area: spark; }
+.chg-ends { grid-area: ends; font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chg-arrow { color: var(--ink-3); margin: 0 4px; }
+.chg-word { grid-area: word; font-size: 14.5px; color: var(--ink-2); }
+.chg-spark { overflow: visible; }
+.chg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chg-list { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; font-size: 16.5px; line-height: 1.45; }
+.chg-sub { color: var(--ink-2); font-size: 14.5px; }
+.chg-events { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; font-size: 16.5px; line-height: 1.45; }
+@media (max-width: 720px) { .chg-cols { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------- navigation v2 */
+.titlebar { display: grid; gap: 4px; margin: 0 0 4px; }
+.tb-back { display: inline-flex; align-items: center; gap: 4px; justify-self: start;
+  min-height: 44px; padding: 0 10px 0 2px; margin-left: -4px; border: 0; background: none;
+  color: var(--ink-2); font: inherit; font-size: 16px; cursor: pointer; border-radius: 10px; }
+.tb-back svg { width: 22px; height: 22px; }
+.tb-back:hover { color: var(--ink-1); background: var(--surface-2); }
+.tb-title { font-family: var(--display); font-size: 27px; line-height: 1.2; margin: 0; font-weight: 640; }
+.tb-ref { justify-self: start; min-height: 40px; padding: 0 12px; margin-top: 6px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface-1); color: var(--ink-1);
+  font: inherit; font-size: 15px; cursor: pointer; }
+.menu { display: grid; gap: 6px; padding: 4px 0 8px; }
+.menu-i { text-align: left; min-height: 52px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink-1); font: inherit; font-size: 17px; cursor: pointer; }
+#menuBtn svg { width: 20px; height: 20px; }
+@media (max-width: 720px) {
+  /* the header: name, place, listen, more - nothing else */
+  #exportBtn, #themeBtn, #soundBtn, #benchChip { display: none !important; }
+  .wordmark { order: 1; }
+  .topbar-spacer { order: 2; }
+  #readBtn { order: 3; }
+  #readStopBtn { order: 4; }
+  #menuBtn { order: 5; }
+  #readBtn, #readStopBtn, #menuBtn { width: 44px; height: 44px; }
+  .chip { font-size: 15px; padding: 7px 12px; }
+  .chip .k { font-size: 12px; }
+  .bottomnav button { font-size: 13px; }
+  .tb-title { font-size: 25px; }
+}
+@media (max-width: 720px) {
+  .chipset { order: 6 !important; }
+}
+
+/* what is it known for */
+.kn-rows { display: grid; gap: 14px; }
+.kn-top { display: flex; justify-content: space-between; gap: 12px; font-size: 17px; }
+.kn-name { font-weight: 600; }
+.kn-v { font-variant-numeric: tabular-nums; font-weight: 700; }
+.kn-track { height: 10px; border-radius: 5px; background: var(--surface-sunk); margin-top: 6px; overflow: hidden; }
+.kn-track i { display: block; height: 100%; border-radius: 5px; background: var(--bar-ink); }
+.kn-sub { font-size: 14.5px; color: var(--ink-2); margin-top: 4px; }

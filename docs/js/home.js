@@ -44,6 +44,9 @@
     peers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="10" width="5" height="10" rx="1"/><rect x="10" y="6" width="5" height="14" rx="1"/><rect x="17" y="11" width="4" height="9" rx="1"/></svg>',
     learn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/></svg>',
     map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3L3 5.5v15L9 18l6 3 6-2.5v-15L15 6 9 3z"/><path d="M9 3v15M15 6v15"/></svg>',
+    hoods: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M3 21V9l5-4 5 4v12"/><path d="M13 21V12l4-3 4 3v9"/><path d="M3 21h18"/></svg>',
+    impact: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="2.5"/><circle cx="12" cy="12" r="6.5" opacity=".7"/><circle cx="12" cy="12" r="10" opacity=".4"/></svg>',
+    brief: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
     arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
   };
 
@@ -280,7 +283,7 @@
     var p = ctx.place;
     var qs = [
       { icon: 'star', q: 'What is it known for?', a: 'The industries it has more of',
-        go: 'structure', sort: 'lq', ok: !!ctx.lq },
+        go: 'structure', ok: !!ctx.lq },
       { icon: 'change', q: 'How has work here changed?', a: '2016 to 2021, and back to 2001',
         go: 'change', ok: p.level !== 'CT' },
       { icon: 'people', q: 'Is it growing?', a: 'Population, births, deaths and moves',
@@ -290,7 +293,14 @@
       { icon: 'peers', q: 'Which places are like it?', a: 'Compare with its peers',
         go: 'peers', ok: p.level === 'CSD' || p.level === 'CT' },
       { icon: 'map', q: 'What about the places around it?', a: 'Explore Ontario on the map',
-        go: 'map', map: 'doing', ok: true }
+        go: 'map', map: 'doing', ok: true },
+      { icon: 'hoods', q: 'How do its neighbourhoods differ?', a: 'Census tracts, 2021',
+        go: 'hoods', ok: !!(ctx.can && ctx.can.neighbourhoods) && p.level !== 'CT' &&
+          !!p.cma },
+      { icon: 'impact', q: 'What if new jobs arrived?', a: 'The knock-on jobs, by industry',
+        go: 'impact', ok: !!(ctx.can && ctx.can.impact) },
+      { icon: 'brief', q: 'All of it as a short brief', a: 'Plain paragraphs to read or copy',
+        go: 'brief', ok: true }
     ].filter(function (x) { return x.ok; });
 
     var c = U.card('Dig deeper', null, { className: 'home-card' });

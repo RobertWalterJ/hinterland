@@ -576,6 +576,21 @@
     return M.roundingSd(2 * nIndustries);
   };
 
+  /* The standard deviation of a CHANGE between two residence vectors, from
+     sampling as well as rounding: every sector count in both years carries
+     M.countSd. The residence tables are long-form samples, so sampling
+     dominates - about 190 for a count of 10,000 against 2 for rounding. The
+     rounding-only figure above (about 12) had the tool calling effects of a
+     few dozen workers in Toronto's 1.3 million real. */
+  M.changeSd = function (v0, v1) {
+    if (!v0 || !v1) return null;
+    var s = 0;
+    for (var i = 0; i < v0.length; i++) {
+      s += Math.pow(M.countSd(v0[i] || 0), 2) + Math.pow(M.countSd(v1[i] || 0), 2);
+    }
+    return Math.sqrt(s);
+  };
+
   M.reliabilityFlag = function (v) {
     if (v == null) return 'missing';
     if (v <= M.MIN_RELIABLE_CELL) return 'withheld';

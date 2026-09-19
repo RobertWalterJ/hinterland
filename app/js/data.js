@@ -609,7 +609,19 @@
       if (n.indexOf(q) === 0) starts.push(p);
       else if (n.indexOf(q) > 0 || p.code.indexOf(q) === 0) has.push(p);
     });
-    starts.sort(bySize); has.sort(bySize);
+    /* Municipalities first - they are the "here" of the question - and an
+       exact name before anything that merely starts with it. Typing "ham"
+       used to list the Hamilton region, metro area and division before the
+       City of Hamilton. */
+    var rank = function (a, b) {
+      var ea = a.name.split(' / ')[0].toLowerCase() === q ? 0 : 1;
+      var eb = b.name.split(' / ')[0].toLowerCase() === q ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      var ca = a.level === 'CSD' ? 0 : 1, cb = b.level === 'CSD' ? 0 : 1;
+      if (ca !== cb) return ca - cb;
+      return bySize(a, b);
+    };
+    starts.sort(rank); has.sort(rank);
     return starts.concat(has).slice(0, 80);
   };
 

@@ -116,8 +116,8 @@
         'Reference economy: ' + ch.ref.label + '. ' + ch.ref.note,
         'Identity check: the three effects sum to the observed change with a ' +
           'residual of ' + ch.identity.toFixed(6) + '.',
-        'Census rounding alone can move any aggregate component by roughly ' +
-          '+/- ' + C.fmt(2 * ch.uncertainty) + ' jobs.'
+        'Census sampling and rounding can move any aggregate component by roughly ' +
+          '+/- ' + C.fmt(Math.round(2 * ch.uncertainty)) + ' working residents.'
       ],
       totals: {
         sector: 'Total', start: t.start, end: t.end, actual: t.actual,
