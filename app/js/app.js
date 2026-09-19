@@ -93,6 +93,7 @@
       var first = D.byCode[A.state.place];
       if (first && first.level === 'CT') D.loadTracts().then(A.render);
       wireReader();
+      initHistory();
       bootEl.classList.add('gone');
       setTimeout(function () { bootEl.remove(); }, 400);
       /* The tract layer and the polygons are not needed to answer the first
@@ -159,8 +160,69 @@
     try {
       var h = new URLSearchParams({ p: A.state.place, b: A.state.benchmark,
                                     t: A.state.tab });
-      history.replaceState(null, '', '#' + h.toString());
+      var hash = '#' + h.toString();
+      var moved = navKey(hash) !== navKey(lastHash);
+      if (histReady && moved && !fromPop) {
+        history.pushState({ hl: 'nav' }, '', hash);
+      } else {
+        history.replaceState(history.state, '', hash);
+      }
+      lastHash = hash;
     } catch (e2) { /* sandboxed; the app works without a shareable URL */ }
+  }
+
+  /* ------------------------------------------------------------ back
+
+     The phone's back gesture must go back, not close the app. The first
+     version only ever REPLACED its one history entry, so there was nothing
+     to go back to. Now every change of place or screen is its own entry, and
+     back is handled in this order:
+       1. an open sheet (the place picker, export) closes;
+       2. a quiz session steps out - to its summary, then to Learn;
+       3. otherwise the previous place and screen come back.
+     Only from the very first screen does back leave the app. A base entry
+     sits under the first screen so that steps 1 and 2 work even there. */
+  var lastHash = '', histReady = false, fromPop = false;
+  function navKey(hash) {
+    var h = new URLSearchParams(String(hash || '').replace(/^#/, ''));
+    return (h.get('p') || '') + '|' + (h.get('t') || '');
+  }
+  function initHistory() {
+    try {
+      var hash = location.hash || lastHash;
+      history.replaceState({ hl: 'base' }, '', hash);
+      history.pushState({ hl: 'nav' }, '', hash);
+      lastHash = hash;
+      histReady = true;
+    } catch (e) { return; }
+    window.addEventListener('popstate', function (e) {
+      function stay() {
+        try { history.pushState({ hl: 'nav' }, '', lastHash); } catch (x) {}
+      }
+      if (document.getElementById('sheet')) { closeSheet(); stay(); return; }
+      var QU = root.GRA.quizUI;
+      if (QU && QU.active()) {
+        if (QU.phase() === 'done') QU.leave(); else QU.stop();
+        stay(); return;
+      }
+      if (e.state && e.state.hl === 'base') {
+        /* back from the first screen: leave, as the platform expects */
+        histReady = false;
+        history.back();
+        return;
+      }
+      var h = new URLSearchParams(location.hash.replace(/^#/, ''));
+      fromPop = true;
+      try {
+        if (h.get('b')) A.state.benchmark = h.get('b');
+        var p = h.get('p'), t = h.get('t');
+        if (t) A.state.tab = t;
+        if (p && p !== A.state.place && D.byCode[p]) A.setPlace(p);
+        else A.render();
+        if (t && A.state.tab !== t) { A.state.tab = t; A.render(); }
+      } finally { fromPop = false; }
+      lastHash = location.hash;
+    });
   }
 
   /* ---------------------------------------------------------- the chrome */

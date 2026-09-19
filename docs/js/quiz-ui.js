@@ -118,6 +118,7 @@
   };
 
   QU.leave = function () { run = null; A.render(); };
+  QU.phase = function () { return run ? run.phase : null; };
 
   /* Commit the pending answer - only when Next is pressed, so "that was a
      misread" can still withdraw it. */
@@ -319,16 +320,17 @@
       esc(verdict) + '</p>' +
       '<p class="qsentence">' + esc(it.card.sentence) + '</p>' +
       picture(it.card.picture, false) +
+      /* Next sits in the flow, straight after the answer - never a bar
+         fixed over the page, which covered the card's own text */
+      '<div class="qnextbar"><button type="button" class="btn btn-primary qnext">' +
+      (run.i + 1 >= run.queue.length ? 'Finish' : 'Next') + '</button></div>' +
       (it.idea && I ? '<p class="qpart">Part of <b>' + esc(I.byId[it.idea].title) +
         '</b></p>' : '') +
       '<p class="qsource">' + esc(sourceLine(it)) + '</p>' +
       more +
       '<button type="button" class="linkbtn qmisread">That was a misread — ask me again</button>' +
       '</div>';
-    var bar = '<div class="qnextbar"><button type="button" class="btn btn-primary qnext">' +
-      (run.i + 1 >= run.queue.length ? 'Finish' : 'Next') + '</button></div>';
-
-    wrap.innerHTML = top + ask.replace(picture(it.prompt, true), '') + marked + card + bar;
+    wrap.innerHTML = top + ask.replace(picture(it.prompt, true), '') + marked + card;
     host.appendChild(wrap);
     wireCard(wrap, it);
     autoRead(wrap.querySelector('.qcard'));

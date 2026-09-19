@@ -1143,10 +1143,7 @@ button.qopt:hover { border-color: var(--ink-3); background: var(--surface-2); }
 .qnat-y { color: var(--ink-2); }
 .qpic-note { font-size: 14px; color: var(--ink-2); margin: 6px 0 0; }
 
-.qnextbar {
-  position: sticky; bottom: 0; margin-top: 16px; padding: 12px 0;
-  background: linear-gradient(to top, var(--surface-0) 70%, transparent);
-}
+.qnextbar { margin: 16px 0 4px; }
 .qnext { width: 100%; min-height: 54px; font-size: 17px; justify-content: center; }
 
 .qstrands { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
@@ -1154,7 +1151,6 @@ button.qopt:hover { border-color: var(--ink-3); background: var(--surface-2); }
 .qset { display: grid; gap: 10px; margin: 6px 0; }
 .qhome { font-size: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 @media (max-width: 720px) {
-  .qnextbar { bottom: 64px; }
   .qbar-row { grid-template-columns: minmax(0, 8em) 1fr auto; }
 }
 

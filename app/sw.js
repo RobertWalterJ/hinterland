@@ -33,7 +33,7 @@
    Bump VERSION to evict an old cache wholesale. */
 
 var PREFIX = 'hinterland-';
-var VERSION = PREFIX + 'v13';
+var VERSION = PREFIX + 'v14';
 /* Caches this app created under its old working name, on origins it has
    always had to itself (the local launcher). Safe to clear; nobody else's. */
 var LEGACY = 'gra-';
