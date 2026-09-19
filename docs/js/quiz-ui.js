@@ -20,20 +20,23 @@
        cannot skip it - a debounce, not a timer;
      - read-aloud on by default: each question, then each card, is read.
 
-   A missed question comes back once, a few questions later in the same
-   session - the learning step the scheduler simulation showed was needed.
+   Version 3 (after Palimpsest): no question twice in a session - a missed
+   one comes back another day; when a big idea opens, its short lesson comes
+   first and its questions test it; every answer card says which big idea it
+   is part of; and the Learn tab shows growth by idea, not a bare count.
    ========================================================================== */
 
 (function (root) {
   'use strict';
 
   var QU = {};
-  var D, C, M, T, A, U, S, B, R;
+  var D, C, M, T, A, U, S, B, R, I;
 
   function init() {
     D = root.GRA.data; C = root.GRA.charts; M = root.GRA.methods;
     T = root.GRA.terms; A = root.GRA.app; U = root.GRA.ui;
     S = root.GRA.quizSched; B = root.GRA.quizBank; R = root.GRA.read;
+    I = root.GRA.quizIdeas;
   }
   function esc(s) { return C.esc(s == null ? '' : String(s)); }
 
@@ -80,15 +83,26 @@
     var now = Date.now();
     var queue = S.plan(st(), bank, now, { home: homeMap() });
     if (!queue.length) return false;
+    var before = S.ideas(st(), bank);
     run = { queue: queue, i: 0, phase: 'ask', conf: null, chosen: null,
-            reasked: {}, asked: 0, right: 0, fresh: 0, learnedNow: 0,
-            startedLearned: Object.keys(st().learnedIds).length };
+            asked: 0, right: 0, fresh: 0, learnedNow: 0,
+            startedLearned: Object.keys(st().learnedIds).length,
+            startedCan: S.canAnswer(st()),
+            openBefore: Object.keys(before).filter(function (k) { return before[k].open; }) };
+    lessonCheck();
     A.render();
     return true;
   };
 
   function current() {
     return run ? B.build().byId[run.queue[run.i]] : null;
+  }
+
+  /* Teach, then test: the first question of a big idea the reader has not
+     been introduced to is preceded by that idea's lesson. */
+  function lessonCheck() {
+    var it = current();
+    if (it && it.idea && I && !st().lessons[it.idea]) run.phase = 'lesson';
   }
 
   function stopReading() { if (R) R.stop(); }
@@ -113,24 +127,14 @@
     var now = Date.now();
     var opt = it.options[run.chosen];
     var right = !!opt.correct;
-    var isReask = run.reasked[it.id] === 'pending-shown';
-    if (isReask) {
-      S.reasked(st(), it, right, now);
-      run.reasked[it.id] = 'done';
-    } else {
-      var before = !!st().learnedIds[it.id];
-      if (!st().items[it.id]) run.fresh++;
-      S.answer(st(), it, right, now, { conf: run.conf, chose: right ? null : opt.label });
-      if (!before && st().learnedIds[it.id]) {
-        run.learnedNow++;
-        /* a question that has held a week later means its terms have too:
-           this is what fades the plain-English scaffolding (terms.js) */
-        (it.terms || []).forEach(function (id) { T.record(id, 'held'); });
-      }
-      if (!right && !run.reasked[it.id]) {
-        run.reasked[it.id] = 'pending';
-        run.queue.splice(S.reaskPosition(run.queue, run.i), 0, it.id);
-      }
+    var before = !!st().learnedIds[it.id];
+    if (!st().items[it.id]) run.fresh++;
+    S.answer(st(), it, right, now, { conf: run.conf, chose: right ? null : opt.label });
+    if (!before && st().learnedIds[it.id]) {
+      run.learnedNow++;
+      /* a question that has held a week later means its terms have too:
+         this is what fades the plain-English scaffolding (terms.js) */
+      (it.terms || []).forEach(function (id) { T.record(id, 'held'); });
     }
     run.asked++; if (right) run.right++;
     S.save(st());
@@ -142,8 +146,7 @@
     run.i++;
     run.phase = run.i >= run.queue.length ? 'done' : 'ask';
     run.conf = null; run.chosen = null;
-    var nxt = current();
-    if (nxt && run.reasked[nxt.id] === 'pending') run.reasked[nxt.id] = 'pending-shown';
+    if (run.phase === 'ask') lessonCheck();
     if (run.phase === 'done') { S.endSession(st(), Date.now()); S.save(st()); }
     A.render();
   }
@@ -223,7 +226,14 @@
   }
 
   function sourceLine(it) {
-    if (it.strand === 'E') return 'From METHODS.md, the statement of every method.';
+    if (it.strand === 'E' || it.form === 'concept') {
+      return 'From METHODS.md, the statement of every method.';
+    }
+    if (it.form === 'class-lean' || it.form === 'class-level' || it.form === 'class-fact' ||
+        it.form === 'type-area') {
+      return 'Statistics Canada, 2021 Census, place of work (98-10-0491), municipalities ' +
+        'grouped by 2021 population.';
+    }
     if (it.strand === 'D') return 'Statistics Canada, components of population change (17-10-0153).';
     if (it.form === 'occupation') return 'Statistics Canada, 2021 Census, 98-10-0456.';
     if (it.form.indexOf('commute') === 0) return 'Statistics Canada, 2021 Census commuting flows, 98-10-0459.';
@@ -232,7 +242,8 @@
 
   var SHOW_TAB = { bigger: 'overview', howmany: 'overview', fingerprint: 'overview',
     largest: 'structure', occupation: 'overview', concentrated: 'structure',
-    'commute-out': 'map', 'commute-in': 'map', twin: 'peers', yesno: 'population' };
+    'commute-out': 'map', 'commute-in': 'map', twin: 'peers', yesno: 'population',
+    'type-which': 'structure', 'big-lean': 'structure' };
 
   /* ------------------------------------------------------------ render */
 
@@ -242,6 +253,7 @@
     if (run.phase === 'done') return renderDone(host);
     var it = current();
     if (!it) { run.phase = 'done'; return renderDone(host); }
+    if (run.phase === 'lesson') return renderLesson(host, it);
 
     var wrap = document.createElement('div');
     wrap.className = 'quiz-wrap';
@@ -307,6 +319,8 @@
       esc(verdict) + '</p>' +
       '<p class="qsentence">' + esc(it.card.sentence) + '</p>' +
       picture(it.card.picture, false) +
+      (it.idea && I ? '<p class="qpart">Part of <b>' + esc(I.byId[it.idea].title) +
+        '</b></p>' : '') +
       '<p class="qsource">' + esc(sourceLine(it)) + '</p>' +
       more +
       '<button type="button" class="linkbtn qmisread">That was a misread — ask me again</button>' +
@@ -377,78 +391,185 @@
     });
   }
 
+  /* ------------------------------------------------------------ lesson */
+
+  function renderLesson(host, it) {
+    var idea = I.byId[it.idea];
+    var pts = I.lesson(it.idea);
+    var wrap = document.createElement('div');
+    wrap.className = 'quiz-wrap';
+    wrap.innerHTML =
+      '<div class="qtop"><span class="qcount">A new big idea</span>' +
+      '<button type="button" class="linkbtn qstop">Stop here</button></div>' +
+      '<div class="qlesson">' +
+      '<p class="qlesson-n">Big idea ' + idea.n + ' of ' + I.IDEAS.length + '</p>' +
+      '<h2 class="qlesson-t">' + esc(idea.title) + '</h2>' +
+      '<p class="qlesson-ask">' + esc(idea.ask) + '</p>' +
+      '<ul class="qlesson-pts">' + pts.map(function (p) {
+        return '<li>' + p + '</li>'; }).join('') + '</ul>' +
+      '<p class="qlesson-note">The next questions test this, then go further.</p>' +
+      '</div>' +
+      '<div class="qnextbar"><button type="button" class="btn btn-primary qgo">' +
+      'Got it, ask me</button></div>';
+    host.appendChild(wrap);
+    wireCommon(wrap);
+    var shownAt = Date.now();
+    wrap.querySelector('.qgo').addEventListener('click', function () {
+      if (Date.now() - shownAt < 600) return;          /* debounce, not a timer */
+      stopReading();
+      st().lessons[it.idea] = Date.now();
+      S.save(st());
+      run.phase = 'ask';
+      A.render();
+    });
+    autoRead(wrap.querySelector('.qlesson'));
+  }
+
+  /* ------------------------------------------------------------ done */
+
   function renderDone(host) {
-    var n = Object.keys(st().learnedIds).length;
+    var bank = B.build();
+    var can = S.canAnswer(st());
+    var up = can - (run.startedCan || 0);
+    var status = S.ideas(st(), bank);
+    var opened = Object.keys(status).filter(function (k) {
+      return status[k].open && run.openBefore.indexOf(k) < 0;
+    });
     var c = U.card('Session finished', null);
-    c.appendChild(U.h('<div class="quiz-wrap"><p class="qsentence">You answered ' +
-      run.asked + ' question' + (run.asked === 1 ? '' : 's') +
-      (run.fresh ? ', ' + run.fresh + ' of them new to you' : '') + '.' +
-      (run.learnedNow ? ' ' + run.learnedNow + ' held from a week or more ago, ' +
-        'so they now count as learned.' : '') + '</p>' +
-      '<p class="explain-plain">Learned so far: <b>' + n + '</b>. That number only ' +
-      'ever goes up. A question counts as learned when you answer it a week or ' +
-      'more after first meeting it.</p>' +
+    c.appendChild(U.h('<div class="quiz-wrap">' +
+      '<p class="qsentence">You answered ' + run.asked + ' question' +
+      (run.asked === 1 ? '' : 's') + (run.fresh ? ', ' + run.fresh + ' of them new' : '') +
+      '.</p>' +
+      '<div class="qgrow"><div class="qgrow-v">' + can + '</div>' +
+      '<div class="qgrow-l">questions you can answer now' +
+      (up > 0 ? ', <b>up ' + up + '</b> this session' : '') + '</div></div>' +
+      (run.learnedNow ? '<p class="explain-plain">' + run.learnedNow + ' held from a week ' +
+        'or more ago, so they now count as learned for good.</p>' : '') +
+      opened.map(function (k) {
+        return '<p class="qopened">New big idea opened: <b>' + esc(status[k].title) +
+          '</b>.' + (st().lessons[k] ? '' : ' Its short lesson comes first next time.') +
+          '</p>';
+      }).join('') +
       '<div class="ctlrow"><button type="button" class="btn btn-primary qagain">' +
-      'Another session</button><button type="button" class="btn qback">Back to Learn' +
+      'Another session</button><button type="button" class="btn qback">See your progress' +
       '</button></div></div>'));
     host.appendChild(c);
     c.querySelector('.qagain').addEventListener('click', function () {
-      run = null; QU.start();
+      run = null;
+      if (!QU.start()) { A.render(); }
     });
     c.querySelector('.qback').addEventListener('click', QU.leave);
   }
 
-  /* ------------------------------------------------------------ hub */
+  /* ------------------------------------------------------------ hub
+
+     The Learn tab's front: what you can answer, how that has grown, and the
+     nine big ideas - which are open, how far in you are, and what you have
+     learned in each, as plain statements. No due counts, no streaks. */
+
+  function growthChart(hist) {
+    if (!hist || hist.length < 2) return '';
+    var max = Math.max.apply(null, hist.map(function (h) { return h.can; })) || 1;
+    return '<div class="qchart" role="img" aria-label="Questions you could answer, ' +
+      'day by day: ' + hist.map(function (h) { return h.can; }).join(', ') + '.">' +
+      hist.map(function (h) {
+        return '<span class="qchart-b' + (h.today ? ' is-today' : '') + '" style="height:' +
+          Math.max(4, 100 * h.can / max) + '%" title="' + esc(h.day) + ': ' + h.can + '"></span>';
+      }).join('') + '</div><p class="qchart-l">Questions you could answer, on each day ' +
+      'you played.</p>';
+  }
+
+  function learnedFacts(ideaId, bank, n) {
+    var s = st();
+    return (bank.byIdea[ideaId] || []).filter(function (it) {
+      var r = s.items[it.id]; return r && r.right;
+    }).sort(function (a, b) { return s.items[b.id].last - s.items[a.id].last; })
+      .slice(0, n || 4).map(function (it) { return it.card.sentence; });
+  }
 
   QU.hub = function () {
     init();
     var s = st(), set = settings();
-    var prog = S.progress(s);
-    var names = { A: 'Size', B: 'What people do', C: 'Connections',
-                  D: 'The long view', E: 'Methods', F: 'History' };
-    var c = U.card('Quiz', 'Short sessions of about twelve questions. No ' +
-      'timer, no score, and you can stop at any point. Every answer about ' +
-      'places is drawn from the same Statistics Canada data as the rest of ' +
-      'the tool; history questions come from the dated, sourced timeline.');
+    var bank = B.build();
+    var prog = S.progress(s, bank);
+    var c = U.card('Your learning', null);
+
+    var weekUp = prog.weekAgoCan != null ? prog.can - prog.weekAgoCan : null;
+    var head = '<div class="qhub-top">' +
+      '<button type="button" class="btn btn-primary qstart">' +
+      (s.sessions ? 'Start a session' : 'Start your first session') + '</button>' +
+      '<p class="qhub-sub">About twelve questions. No timer, no score; stop whenever ' +
+      'you like.</p></div>';
+    var nums = s.sessions ? '<div class="qhub-nums">' +
+      '<div><div class="qgrow-v">' + prog.can + '</div><div class="qgrow-l">you can ' +
+      'answer now' + (weekUp > 0 ? ', up ' + weekUp + ' on a week ago' : '') + '</div></div>' +
+      (prog.learned ? '<div><div class="qgrow-v">' + prog.learned + '</div><div class="qgrow-l">' +
+        'held for a week or more</div></div>' : '') +
+      (prog.turned ? '<div><div class="qgrow-v">' + prog.turned + '</div><div class="qgrow-l">' +
+        'missed once, right later</div></div>' : '') +
+      '</div>' + growthChart(prog.history) : '';
+
+    var ideas = I ? I.IDEAS.map(function (idea) {
+      var x = prog.ideas[idea.id];
+      var status = !x.open ? 'Opens as you learn the one before'
+        : x.met === 0 ? 'Open, not started'
+        : x.can + ' you can answer · ' + ['', 'basics open', 'basics and places open',
+            'everything open'][x.level];
+      var facts = x.open ? learnedFacts(idea.id, bank, 4) : [];
+      var lesson = x.open ? I.lesson(idea.id) : [];
+      return '<details class="qidea' + (x.open ? '' : ' is-locked') + '">' +
+        '<summary><span class="qidea-n">' + idea.n + '</span>' +
+        '<span class="qidea-t"><span class="qidea-title">' + esc(idea.title) + '</span>' +
+        '<span class="qidea-s">' + esc(status) + '</span>' +
+        (x.open ? '<span class="qidea-bars" aria-hidden="true">' + [1, 2, 3].map(function (L) {
+          var lv = x.levels[L];
+          var w = lv.total ? Math.round(100 * lv.can / lv.total) : 0;
+          return '<span class="qidea-bar' + (L > x.level ? ' is-shut' : '') + '"><i style="width:' +
+            (lv.can ? Math.max(6, w) : 0) + '%"></i></span>';
+        }).join('') + '</span><span class="qidea-key">Basics · Places · Surprises</span>' : '') +
+        '</span></summary>' +
+        (x.open ? '<div class="qidea-body">' +
+          '<p class="qidea-ask">' + esc(idea.ask) + '</p>' +
+          '<ul class="qlesson-pts">' + lesson.map(function (p) { return '<li>' + p + '</li>'; }).join('') + '</ul>' +
+          (facts.length ? '<p class="qidea-h">What you have learned here</p><ul class="qidea-facts">' +
+            facts.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join('') + '</ul>' : '') +
+          '</div>' : '') +
+        '</details>';
+    }).join('') : '';
 
     var body = document.createElement('div');
-    body.innerHTML =
-      '<div class="ctlrow" style="margin:6px 0 12px">' +
-      '<button type="button" class="btn btn-primary qstart">' +
-      (s.sessions ? 'Start a session' : 'Start your first session') + '</button></div>' +
-      '<p class="explain-plain">Learned so far: <b>' + prog.learned + '</b>' +
-      (prog.seen ? ' of the ' + prog.seen + ' questions you have met.' : '.') + '</p>' +
-      '<div class="qstrands">' + Object.keys(names).map(function (k) {
-        return '<span class="qstrand"><b>' + (prog.byStrand[k] || 0) + '</b> ' +
-          esc(names[k]) + '</span>';
-      }).join('') + '</div>' +
-      '<div class="qset">' +
+    body.innerHTML = head + nums +
+      '<h3 class="subh" style="margin-top:18px">The big ideas</h3>' +
+      '<p class="card-note">Each question is part of one of these. They open in order, ' +
+      'from what many people know to what only the data shows.</p>' +
+      '<div class="qideas">' + ideas + '</div>' +
+      '<details class="qsettings"><summary>Settings</summary><div class="qset">' +
       '<label class="toggle"><input type="checkbox" class="qread"' +
       (set.read ? ' checked' : '') + '> Read each question to me</label>' +
       '<label class="toggle"><input type="checkbox" class="qjump"' +
-      (s.jumpAhead ? ' checked' : '') + '> Open every kind of question now</label>' +
+      (s.jumpAhead ? ' checked' : '') + '> Open every big idea now</label>' +
       '<label class="qhome">Your home region: <select class="sel qhomesel">' +
       '<option value="">None</option>' +
       Object.keys(D.geo.er_names).sort(function (a, b) {
         return D.geo.er_names[a] < D.geo.er_names[b] ? -1 : 1;
       }).map(function (er) {
         return '<option value="' + er + '"' + (set.homeER === er ? ' selected' : '') +
-          '>' + esc(D.geo.er_names[er]) + '</option>';
-      }).join('') + '</select></label></div>' +
-      '<p class="card-foot">Questions about your home region come first: ' +
-      'new facts stick better when they attach to places you know.</p>';
+          '>' + esc(String(D.geo.er_names[er]).split(' / ')[0].replace(/--/g, '–')) + '</option>';
+      }).join('') + '</select></label>' +
+      '<p class="card-foot">Questions about your home region come first: new facts ' +
+      'stick better when they attach to places you know.</p></div></details>';
     c.appendChild(body);
 
     body.querySelector('.qstart').addEventListener('click', function () {
       if (!QU.start()) {
-        body.querySelector('.qstart').textContent = 'Nothing is due just now';
+        body.querySelector('.qstart').textContent = 'Nothing new just now. Come back later.';
       }
     });
     body.querySelector('.qread').addEventListener('change', function (e) {
       var x = settings(); x.read = e.target.checked; saveSettings(x);
     });
     body.querySelector('.qjump').addEventListener('change', function (e) {
-      s.jumpAhead = e.target.checked; S.save(s);
+      s.jumpAhead = e.target.checked; S.save(s); A.render();
     });
     body.querySelector('.qhomesel').addEventListener('change', function (e) {
       var x = settings(); x.homeER = e.target.value; saveSettings(x);

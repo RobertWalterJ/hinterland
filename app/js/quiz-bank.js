@@ -185,7 +185,8 @@
       chip: o.chip, stem: o.stem, prompt: o.prompt || null,
       options: opts, card: o.card, more: o.more || null,
       tags: o.tags || [], surprise: o.surprise || 0,
-      prior: o.prior == null ? 0.5 : o.prior, terms: o.terms || []
+      prior: o.prior == null ? 0.5 : o.prior, terms: o.terms || [],
+      idea: o.idea || null, level: o.level || null
     };
   }
 
@@ -748,9 +749,19 @@
     genNatural(out);
     genWhichMethod(out); genCannot(out); genReadLQ(out);
     genWhichFirst(out); genDataHistory(out);
-    var byId = {};
-    out.forEach(function (it) { byId[it.id] = it; });
-    Q._bank = { items: out, byId: byId };
+    /* every question belongs to a big idea and a level, or it is not asked
+       (quiz-ideas.js); the ideas add their own questions first */
+    var I = root.GRA.quizIdeas;
+    if (I) {
+      I.generate(out);
+      out = out.filter(function (it) { return I.classify(it); });
+    }
+    var byId = {}, byIdea = {};
+    out.forEach(function (it) {
+      byId[it.id] = it;
+      (byIdea[it.idea] = byIdea[it.idea] || []).push(it);
+    });
+    Q._bank = { items: out, byId: byId, byIdea: byIdea };
     return Q._bank;
   };
 
@@ -765,6 +776,11 @@
 
   /* exposed for the self-test */
   Q._gates = { namesOk: namesOk, confusable: confusable, optName: optName, about: about };
+  /* the helpers quiz-ideas.js builds its questions with, so its questions
+     pass the same gates */
+  Q._h = { item: item, about: about, clear: clear, namesOk: namesOk,
+           optName: optName, shuffle: shuffle, total: total, vec: vec,
+           csds: csds, FLOOR: FLOOR };
 
   root.GRA = root.GRA || {};
   root.GRA.quizBank = Q;

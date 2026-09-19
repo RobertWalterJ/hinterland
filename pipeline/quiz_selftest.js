@@ -25,7 +25,7 @@ globalThis.fetch = (u) => {
 };
 
 const geval = eval;
-for (const f of ['methods.js', 'charts.js', 'data.js', 'terms.js', 'history.js', 'quiz-bank.js']) {
+for (const f of ['methods.js', 'charts.js', 'data.js', 'terms.js', 'history.js', 'quiz-bank.js', 'quiz-ideas.js']) {
   geval(fs.readFileSync(path.join(APP, 'js', f), 'utf8'));
 }
 const G = globalThis.GRA;
@@ -96,8 +96,15 @@ function words(s) { return String(s || '').trim().split(/\s+/).filter(Boolean).l
                cardMax: Math.max(...cardWords[s]), cardP90: q(cardWords[s], 0.9) };
   }
 
+  const byIdea = {};
+  let unplaced = 0;
+  for (const it of items) {
+    if (!it.idea || !it.level) { unplaced++; continue; }
+    byIdea[it.idea] = byIdea[it.idea] || {};
+    byIdea[it.idea][it.level] = (byIdea[it.idea][it.level] || 0) + 1;
+  }
   const out = {
-    items: items.length, buildMs: ms, byForm, lengths: len,
+    items: items.length, buildMs: ms, byForm, lengths: len, byIdea, unplaced,
     problems: problems.slice(0, 20), problemCount: problems.length,
     surprising: items.filter((i) => i.surprise > 0).length
   };

@@ -35,7 +35,7 @@ globalThis.fetch = (u) => {
 };
 const geval = eval;
 for (const f of ['methods.js', 'charts.js', 'data.js', 'terms.js', 'history.js',
-                 'quiz-bank.js', 'quiz-sched.js']) {
+                 'quiz-bank.js', 'quiz-ideas.js', 'quiz-sched.js']) {
   geval(fs.readFileSync(path.join(APP, 'js', f), 'utf8'));
 }
 const G = globalThis.GRA;
@@ -60,6 +60,7 @@ function simulate(bank, seed, days) {
   const trace = [];
   let post = null;
   let reviews = 0, recalledAtReview = 0, learnedReviews = 0, learnedRecalled = 0;
+  let repeats = 0, placeRepeats = 0;
 
   for (let d = 0; d < days; d++) {
     const now = t0 + d * DAY;
@@ -79,19 +80,13 @@ function simulate(bank, seed, days) {
     });
 
     const queue = plan.slice(0, take);
-    const reasked = {};
+    /* no question twice in a session, no place twice in a session */
+    if (new Set(queue).size !== queue.length) repeats++;
+    const places = queue.map((id) => bank.byId[id].place).filter(Boolean);
+    if (new Set(places).size !== places.length) placeRepeats++;
     for (let i = 0; i < queue.length; i++) {
       const it = bank.byId[queue[i]];
-      if (reasked[it.id] === 'pending') {
-        /* the learning step: minutes after seeing the card */
-        reasked[it.id] = 'done';
-        const m2 = mem[it.id];
-        const rec2 = rnd() < 0.85;
-        S.reasked(st, it, rec2 || rnd() < 1 / it.options.length, now);
-        if (rec2) m2.stab = Math.max(m2.stab, 1.2 + 1.5 * (1 - m2.diff));
-        m2.seen = now;
-        continue;
-      }
+      if (it.idea && !st.lessons[it.idea]) st.lessons[it.idea] = now;  /* the lesson screen */
       const k = it.options.length;
       let m = mem[it.id];
       if (!m) {
@@ -106,10 +101,6 @@ function simulate(bank, seed, days) {
       if (isFirstBack && i < 3 && m.seen) { firstBackAsked++; if (recalled) firstBackRecalled++; }
       const conf = recalled ? 'sure' : 'guess';
       S.answer(st, it, right, now, { conf, chose: right ? null : 'x' });
-      if (!right && !reasked[it.id]) {
-        reasked[it.id] = 'pending';
-        queue.splice(S.reaskPosition(queue, i), 0, it.id);
-      }
       /* The answer card is a learning event, right or wrong. A successful
          recall strengthens memory MORE when it was harder - retrievability
          R was lower - which is the principle behind FSRS. A flat gain let
@@ -122,7 +113,14 @@ function simulate(bank, seed, days) {
         m.stab = m.stab ? m.stab * (1.2 + 3.5 * (1 - R) + 1.2 * (1 - m.diff))
                         : 3 * (1.3 - 0.6 * m.diff);
       } else {
-        m.stab = m.stab ? Math.max(0.4, m.stab * 0.4) : 0.4;
+        /* Reading the answer card after a miss still leaves something, and
+           more each time it is read (the testing effect with feedback). The
+           first model had no such growth: once the same-session re-ask was
+           removed, a question missed twice could never be learned at all,
+           and recall at review fell to 6% - a fault of the model, not of
+           the reader. Growth per exposure is modest: 0.4 days, then x1.6. */
+        m.fails = (m.fails || 0) + 1;
+        m.stab = Math.max(m.stab ? m.stab * 0.4 : 0, 0.4 * Math.pow(1.6, m.fails - 1));
       }
       if (m.seen && it.id in st.items) {
         reviews++;
@@ -160,8 +158,12 @@ function simulate(bank, seed, days) {
     return m && m.seen ? Math.exp(-((end - m.seen) / DAY) / m.stab) : 0;
   });
   const meanRet = ret.length ? ret.reduce((a, b) => a + b, 0) / ret.length : 0;
-  const strandsLearned = [...new Set(learnedIds.map((id) => id.charAt(0)))].sort();
-  return { trace, post, meanRet, strandsLearned, state: st,
+  const strandsLearned = [...new Set(learnedIds.map((id) => bank.byId[id].idea))].sort();
+  const status = S.ideas(st, bank);
+  const opened = Object.keys(status).filter((k) => status[k].open).length;
+  const canEnd = S.canAnswer(st);
+  return { trace, post, meanRet, strandsLearned, state: st, repeats, placeRepeats,
+           opened, canEnd,
            recallAtReview: reviews ? recalledAtReview / reviews : 0,
            learnedHeld: learnedReviews ? learnedRecalled / learnedReviews : null,
            learnedReviews };
@@ -171,7 +173,7 @@ function simulate(bank, seed, days) {
   await G.data.load();
   const bank = G.quizBank.build();
   const days = 90;
-  const runs = [11, 23, 47].map((seed) => ({ seed, ...simulate(bank, seed, days) }));
+  const runs = [11, 23, 47, 59, 71, 83, 97].map((seed) => ({ seed, ...simulate(bank, seed, days) }));
   const again = simulate(bank, 11, days);
   const deterministic = JSON.stringify(again.trace) === JSON.stringify(runs[0].trace);
 
@@ -189,17 +191,27 @@ function simulate(bank, seed, days) {
     const maxDue = Math.max(...t.map((x) => x.dueTomorrow));
     const lastDue = t[t.length - 1].dueTomorrow;
     const monotone = t.every((x, i) => i === 0 || x.learned >= t[i - 1].learned);
+    /* the backlog as a share of questions met, over the last ten sessions:
+       it grows with the pool (more questions, more reviews); what must not
+       happen is growth faster than the pool, or one stopped-early day read
+       as the trend */
+    const last10 = t.slice(-10);
+    const dueShare = last10.reduce((a, x) => a + x.dueTomorrow / Math.max(1, x.seen), 0) /
+                     last10.length;
     return {
       seed: r.seed, sessions: t.length,
       seen: t[t.length - 1].seen, learned: t[t.length - 1].learned,
       starvedSessions: starved, maxDueTomorrow: maxDue, finalDueTomorrow: lastDue,
       maxInterval: Math.max(...t.map((x) => x.maxIvl)),
-      learnedNeverFalls: monotone,
+      learnedNeverFalls: monotone, dueShareLate: +dueShare.toFixed(3),
       postBreak: r.post, meanRetentionOfLearned: +r.meanRet.toFixed(3),
       recallAtReview: +r.recallAtReview.toFixed(3),
       learnedHeldAtNextReview: r.learnedHeld == null ? null : +r.learnedHeld.toFixed(3),
       learnedReviews: r.learnedReviews,
-      strandsLearned: r.strandsLearned.join('')
+      strandsLearned: r.strandsLearned.join(','),
+      ideasLearned: r.strandsLearned.length,
+      ideasOpened: r.opened, canAnswer: r.canEnd,
+      sessionsWithRepeats: r.repeats, sessionsWithPlaceRepeats: r.placeRepeats
     };
   });
 
@@ -227,12 +239,15 @@ function simulate(bank, seed, days) {
                   (c.learnedHeldAtNextReview == null ? 'n/a'
                    : (100 * c.learnedHeldAtNextReview).toFixed(0) + '% of ' +
                      c.learnedReviews));
-      console.log('  strands with something learned: ' + c.strandsLearned + '\n');
+      console.log('  ideas opened: ' + c.ideasOpened + ' of 9; with something held: ' +
+                  c.strandsLearned + '; can answer at the end: ' + c.canAnswer);
+      console.log('  sessions with a repeated question: ' + c.sessionsWithRepeats +
+                  '; with a place twice: ' + c.sessionsWithPlaceRepeats + '\n');
     }
-    const r0 = runs[0].trace;
+    const r0 = runs[process.env.RUN ? +process.env.RUN : 0].trace;
     console.log('seed 11, every 10th session:');
     console.log('  day  asked  new  right  learned  seen  due-tomorrow  max-interval');
-    r0.filter((_, i) => i % 10 === 0).forEach((x) => {
+    r0.filter((_, i) => i % (process.env.EVERY ? +process.env.EVERY : 10) === 0).forEach((x) => {
       console.log('  ' + String(x.day).padStart(3) + String(x.asked).padStart(7) +
         String(x.fresh).padStart(5) + String(x.correct).padStart(7) +
         String(x.learned).padStart(9) + String(x.seen).padStart(6) +

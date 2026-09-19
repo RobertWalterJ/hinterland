@@ -33,7 +33,7 @@
    Bump VERSION to evict an old cache wholesale. */
 
 var PREFIX = 'hinterland-';
-var VERSION = PREFIX + 'v12';
+var VERSION = PREFIX + 'v13';
 /* Caches this app created under its old working name, on origins it has
    always had to itself (the local launcher). Safe to clear; nobody else's. */
 var LEGACY = 'gra-';
@@ -56,7 +56,7 @@ var SHELL = [
   'js/spatial.js',
   'js/ttwa.js', 'js/brief.js', 'js/exportui.js', 'js/panels.js',
   'js/panel-population.js', 'js/panel-region.js', 'js/panel-impact.js',
-  'js/learn.js', 'js/home.js', 'js/quiz-bank.js', 'js/quiz-sched.js', 'js/quiz-ui.js',
+  'js/learn.js', 'js/home.js', 'js/quiz-bank.js', 'js/quiz-ideas.js', 'js/quiz-sched.js', 'js/quiz-ui.js',
   'js/app.js',
   'manifest.webmanifest'
 ];
