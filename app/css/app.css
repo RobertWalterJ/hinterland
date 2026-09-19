@@ -1065,3 +1065,95 @@ select.sel {
 .chiprow-label { font-size: 14px; color: var(--ink-2); margin: 0 10px 6px 0; }
 .subh { font-size: 16px; font-weight: 640; margin: 0 0 6px; line-height: 1.35; }
 .bars { margin: 6px 0 4px; }
+
+/* ================================================================ quiz ==
+   Phone-first, one question per screen. Sizes follow the dyslexia review:
+   stems at 20px in the sans face with no negative tracking, options at
+   least 56px tall and 17px, sentence case throughout, and right/wrong shown
+   by WORD and an ink icon - never by green and red alone, and never with
+   this tool's red, which already means "shrank".                         */
+
+.quiz-wrap { max-width: 640px; margin: 0 auto; padding-bottom: 88px; }
+.qtop { display: flex; justify-content: space-between; align-items: center; margin: 2px 0 14px; }
+.qcount { font-size: 14.5px; color: var(--ink-2); }
+.qchip {
+  display: inline-block; margin: 0 0 10px; padding: 4px 11px;
+  border: 1px solid var(--line-strong); border-radius: 999px;
+  font-size: 14px; color: var(--ink-2); background: var(--surface-2);
+}
+.qstem {
+  font-family: var(--sans, inherit); font-size: 20px; font-weight: 640;
+  line-height: 1.4; letter-spacing: 0; margin: 0 0 16px; max-width: 34ch;
+}
+.qconf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
+.qconf-l { font-size: 14px; color: var(--ink-2); width: 100%; }
+.qconf-b {
+  min-height: 40px; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface-1);
+  font: inherit; font-size: 15px; color: var(--ink-1); cursor: pointer;
+}
+.qconf-b[aria-pressed="true"] { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+
+.qopts { display: grid; gap: 10px; }
+.qopt {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  min-height: 56px; padding: 12px 16px; text-align: left;
+  border: 1.5px solid var(--line-strong); border-radius: 12px;
+  background: var(--surface-1); color: var(--ink-1);
+  font: inherit; font-size: 17px; line-height: 1.35; cursor: pointer;
+}
+button.qopt:hover { border-color: var(--ink-3); background: var(--surface-2); }
+.qkey {
+  flex: none; display: inline-grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1.5px solid var(--ink-3); font-size: 14px; font-weight: 700; color: var(--ink-2);
+}
+.qlabel { flex: 1; }
+.qmark { flex: none; font-size: 20px; font-weight: 700; color: var(--ink-1); }
+.qopts.is-answered .qopt { cursor: default; opacity: .72; }
+.qopts.is-answered .qopt.is-right { opacity: 1; border-color: var(--ink-1); border-width: 2.5px; }
+.qopts.is-answered .qopt.is-chosen { opacity: 1; border-style: dashed; }
+
+.qcard { margin-top: 18px; padding: 16px 18px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.qverdict { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 19px; font-weight: 700; }
+.qvicon {
+  display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--ink-1); color: var(--surface-1); font-size: 16px;
+}
+.qverdict.is-wrong .qvicon { background: transparent; color: var(--ink-1); border: 2px solid var(--ink-1); }
+.qsentence { font-size: 17px; line-height: 1.55; margin: 0 0 12px; max-width: 60ch; }
+.qsource { font-size: 14px; color: var(--ink-2); margin: 10px 0 0; }
+.qmore { margin-top: 12px; }
+.qmore > summary { cursor: pointer; font-size: 15.5px; font-weight: 600; min-height: 40px; display: flex; align-items: center; }
+.qmore-p { font-size: 16px; line-height: 1.55; margin: 6px 0; max-width: 60ch; }
+.qmisread { display: block; margin-top: 10px; }
+
+.qpic { margin: 6px 0 4px; }
+.qbars { display: grid; gap: 7px; }
+.qbar-row { display: grid; grid-template-columns: minmax(0, 11em) 1fr auto; gap: 10px; align-items: center; font-size: 15px; }
+.qbar-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qbar-t { height: 12px; background: var(--surface-sunk); border-radius: 6px; overflow: hidden; }
+.qbar-t i { display: block; height: 100%; background: var(--ink-2); border-radius: 6px; }
+.qbar-v { font-variant-numeric: tabular-nums; color: var(--ink-2); min-width: 3.2em; text-align: right; }
+.qnat { display: flex; align-items: flex-end; gap: 12px; height: 92px; }
+.qnat-col { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1; font-size: 13px; }
+.qnat-bar { width: 22px; border-radius: 4px; background: var(--ink-2); }
+.qnat-bar.is-down { background: transparent; border: 2px solid var(--ink-2); }
+.qnat-v { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.qnat-y { color: var(--ink-2); }
+.qpic-note { font-size: 14px; color: var(--ink-2); margin: 6px 0 0; }
+
+.qnextbar {
+  position: sticky; bottom: 0; margin-top: 16px; padding: 12px 0;
+  background: linear-gradient(to top, var(--surface-0) 70%, transparent);
+}
+.qnext { width: 100%; min-height: 54px; font-size: 17px; justify-content: center; }
+
+.qstrands { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.qstrand { font-size: 14.5px; padding: 5px 11px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+.qset { display: grid; gap: 10px; margin: 6px 0; }
+.qhome { font-size: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+@media (max-width: 720px) {
+  .qnextbar { bottom: 64px; }
+  .qbar-row { grid-template-columns: minmax(0, 8em) 1fr auto; }
+}

@@ -56,7 +56,7 @@ var SHELL = [
   'js/spatial.js',
   'js/ttwa.js', 'js/brief.js', 'js/exportui.js', 'js/panels.js',
   'js/panel-population.js', 'js/panel-region.js', 'js/panel-impact.js',
-  'js/learn.js',
+  'js/learn.js', 'js/quiz-bank.js', 'js/quiz-sched.js', 'js/quiz-ui.js',
   'js/app.js',
   'manifest.webmanifest'
 ];

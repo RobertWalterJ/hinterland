@@ -467,6 +467,12 @@
   L.panel = function (host, ctx, phone) {
     init();
     var h = U.h, card = U.card;
+
+    /* A quiz session in progress takes the whole view: one question per
+       screen, nothing else competing for attention. */
+    var QU = root.GRA.quizUI;
+    if (QU && QU.active()) { QU.render(host); return; }
+    if (QU) host.appendChild(QU.hub());
     var n = T.counts();
     var focus = A.state.learnFocus;
     A.state.learnFocus = null;

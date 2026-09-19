@@ -67,6 +67,15 @@ function words(s) { return String(s || '').trim().split(/\s+/).filter(Boolean).l
         problems.push(it.id + ': confusable option names ' + labels.join(' / '));
       }
     }
+    /* principle 3: no question hands over its own answer by name. The
+       place named in the stem must share no telling word with any option. */
+    if (['commute-out', 'commute-in', 'twin'].includes(it.form) && it.place) {
+      const stemPlace = G.data.byCode[it.place];
+      const sp = stemPlace ? G.quizBank._gates.optName(stemPlace) : null;
+      if (sp && !G.quizBank._gates.namesOk(labels, sp)) {
+        problems.push(it.id + ': an option shares a word with ' + sp);
+      }
+    }
     /* every option carries its spoken form, with its letter */
     if (it.options.some((o) => !/^Option [ABC]\. /.test(o.say || ''))) {
       problems.push(it.id + ': option without a spoken form');
