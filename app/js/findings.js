@@ -320,6 +320,9 @@
     if (Math.abs(t.mix) < band || Math.abs(t.competitive) < band) return null;
     if ((t.mix > 0) === (t.competitive > 0)) return null;
     var tailwind = t.mix > 0;
+    /* Scale matters: a 48-job headwind beside a 942-job gain is not "the
+       problem", and saying so would teach the wrong reading of the method. */
+    var small = Math.abs(t.mix) < 0.25 * Math.abs(t.competitive);
     return {
       score: 0.7,
       tag: 'change',
@@ -330,12 +333,14 @@
           'growth than the same sectors did elsewhere, costing ' +
           C.fmt(Math.abs(Math.round(t.competitive))) + '. It had the right ' +
           'industries and lost ground in them.'
-        : 'It gained ground against a structural headwind. Its starting ' +
+        : 'It gained ground against ' + (small ? 'a small' : 'a') +
+          ' structural headwind. Its starting ' +
           'industry mix cost it ' + C.fmt(Math.abs(Math.round(t.mix))) +
           ' jobs, because those sectors were shrinking province-wide — but it ' +
           'held on to ' + C.signed(Math.round(t.competitive)) + ' more than ' +
-          'the same sectors managed elsewhere. The problem is the inheritance, ' +
-          'not the performance.'
+          'the same sectors managed elsewhere. ' + (small
+            ? 'Its own performance is much the bigger part of the story.'
+            : 'It did well with a difficult inheritance.')
     };
   });
 

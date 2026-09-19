@@ -633,6 +633,11 @@
     return s + verdict;
   };
 
+  /* shared with the phone home screen (home.js) */
+  L.orderSentence = function (a, b, c) { init(); return orderSentence(a, b, c); };
+  L.sdFromCI = function (t) { init(); return sdFromCI(t); };
+  L.homeWorkNote = function (code) { init(); return homeWorkNote(code); };
+
   function attach() {
     if (root.GRA && root.GRA.panels && root.GRA.ui) {
       root.GRA.panels.learn = L.panel;

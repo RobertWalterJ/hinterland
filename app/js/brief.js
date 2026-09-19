@@ -478,6 +478,11 @@
       };
       RD.onChange(paintRead);
       readBtn.addEventListener('click', function () {
+        /* On a phone the brief folds after its first paragraph. Listening is
+           the way round reading it, so open the folds and read it all. */
+        Array.prototype.forEach.call(
+          document.querySelectorAll('#view details.note-more:not([open])'),
+          function (d) { d.open = true; });
         RD.toggle(document.getElementById('view'));
       });
     }

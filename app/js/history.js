@@ -278,14 +278,16 @@
     tl.innerHTML = '<h3 class="subh">The longer story</h3>' +
       H.timeline.map(function (e) {
         var also = e.seeAlso ? seeAlsoText(e.seeAlso, s) : '';
-        return '<div class="tl-item"><div class="tl-date">' + esc(e.date) +
-          '</div><div class="tl-body"><p class="tl-title">' + esc(e.title) +
-          '</p><p class="tl-fact">' + esc(e.fact) + '</p>' +
+        /* a scannable list of dates and names; each opens to its story */
+        return '<details class="tl-item"><summary><span class="tl-date">' +
+          esc(e.date) + '</span><span class="tl-title">' + esc(e.title) +
+          '</span></summary><div class="tl-body"><p class="tl-fact">' +
+          esc(e.fact) + '</p>' +
           (also ? '<p class="tl-also"><span class="tl-also-k">In the data:</span> ' +
             esc(also) + '</p>' : '') +
           '<p class="tl-src">Source: <a href="' + esc(e.source.url) +
           '" target="_blank" rel="noopener">' + esc(e.source.name) + '</a></p>' +
-          '</div></div>';
+          '</div></details>';
       }).join('');
     c.appendChild(tl);
     return c;

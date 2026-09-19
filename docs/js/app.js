@@ -624,9 +624,9 @@
     var tab = A.state.tab;
 
     /* Tabs the phone layout folds into others. */
-    if (phone && (tab === 'sources' || tab === 'structure' || tab === 'hoods')) {
-      if (tab === 'structure') tab = 'overview';
-    }
+    /* (Structure used to fold into the overview on a phone. The phone home
+       now links to it directly - "What is it known for?" - so it opens as
+       its own screen.) */
 
     var fn = P[tab] || P.overview;
     /* The reader holds references into the panel being replaced, so it has
@@ -636,6 +636,7 @@
     host.innerHTML = '';
     try {
       fn(host, ctx, phone);
+      if (phone && root.GRA.ui.foldLong) root.GRA.ui.foldLong(host);
     } catch (e) {
       console.error(e);
       host.innerHTML = '<div class="card"><h3>That did not render.</h3>' +
@@ -739,13 +740,26 @@
     var el = sheet('Where?',
       '<div class="sheet-head" style="border:0;padding-bottom:0">' +
       '<input class="search" id="q" placeholder="Municipality, region, or neighbourhood…" ' +
-      'autocomplete="off" spellcheck="false"></div>' +
+      'autocomplete="off" spellcheck="false">' +
+      (root.GRA.home && 'geolocation' in navigator
+        ? '<button type="button" class="btn home-btn pick-here" id="pickHere">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+          'stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 ' +
+          '7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>' +
+          '<span>Use where I am</span></button>' +
+          '<div class="home-msg" id="pickHereMsg" hidden role="status" aria-live="polite"></div>'
+        : '') +
+      '</div>' +
       '<div class="sheet-body"><div class="optlist" id="results"></div></div>' +
       '<div class="sheet-foot" id="pickFoot">577 municipalities · 49 census divisions · ' +
       '11 economic regions · 47 metropolitan areas · 2,533 neighbourhoods</div>');
 
     var q = el.querySelector('#q');
     var results = el.querySelector('#results');
+    var here = el.querySelector('#pickHere');
+    if (here) here.addEventListener('click', function () {
+      root.GRA.home.locate(el.querySelector('#pickHereMsg'), here);
+    });
     var cur = -1, list = [];
 
     function paint() {

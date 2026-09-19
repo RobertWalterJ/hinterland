@@ -43,8 +43,34 @@
         (opts.badge ? '<span class="eyebrow">' + C.esc(opts.badge) + '</span>' : '') +
         '</div>';
     }
-    c.innerHTML = head + (noteHTML ? '<p class="card-note">' + noteHTML + '</p>' : '');
+    c.innerHTML = head + (noteHTML ? foldNote(noteHTML, c, opts) : '');
+    if (c.querySelector('.note-more')) {
+      var lead = c.querySelector('.note-lead');
+      c.querySelector('.note-more').addEventListener('toggle', function (e) {
+        lead.hidden = e.target.open;
+      });
+    }
     return c;
+  }
+
+  /* On a phone a card's explanation folds to its first sentence, with the
+     rest one tap away: a screen of caveats before the chart is a wall for any
+     reader and a real barrier for a dyslexic one. Warning cards fold too, but
+     their title already says the warning, and their first sentence stays. */
+  function foldNote(noteHTML, c, opts) {
+    var full = '<p class="card-note">' + noteHTML + '</p>';
+    var phone = window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+    if (!phone || opts.keepNote) return full;
+    var tmp = document.createElement('div');
+    tmp.innerHTML = noteHTML;
+    var text = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+    if (text.split(' ').length <= 28) return full;
+    var m = text.match(/^.+?[.!?](?=\s+["“(]?[A-Z0-9])/);
+    var lead = m ? m[0] : null;
+    if (!lead || lead.length > 0.75 * text.length) return full;
+    return '<p class="card-note note-lead">' + C.esc(lead) + '</p>' +
+      '<details class="note-more"><summary>Why and how</summary>' + full +
+      '</details>';
   }
 
   function stat(value, label, hint, cls) {
@@ -170,8 +196,21 @@
 
   /* ===================================================== 1. OVERVIEW */
 
+  /* On a phone the overview opens on the home screen (home.js): where you
+     are, what people do here, and the next questions. This full overview is
+     still there, one tap down, built only when opened. */
   P.overview = function (host, ctx, phone) {
     init();
+    if (phone && root.GRA.home) {
+      root.GRA.home.render(host, ctx, function (inner) {
+        overviewFull(inner, ctx, phone, true);
+      });
+      return;
+    }
+    overviewFull(host, ctx, phone, false);
+  };
+
+  function overviewFull(host, ctx, phone, underHome) {
     if (!ctx.local || !ctx.ref) {
       host.appendChild(noData(ctx));
       return;
@@ -219,7 +258,7 @@
     /* The question the tool is asked most, answered in words, straight after
        the headline: what the jobs here are, and what the people who live here
        do. Two different questions, kept side by side. */
-    if (LR && p.level === 'CSD') host.appendChild(LR.whatPeopleDo(ctx, phone));
+    if (LR && p.level === 'CSD' && !underHome) host.appendChild(LR.whatPeopleDo(ctx, phone));
 
     if (cm) {
       var cCom = card('Commuting, and what it can and cannot tell you',
@@ -2029,6 +2068,60 @@
 
   root.GRA = root.GRA || {};
   root.GRA.panels = P;
-  root.GRA.ui = { card: card, table: table, h: h, seg: seg, stat: stat,
+  /* The same idea after a panel has rendered, for the parts card() does not
+     build: long footnotes fold to their first sentence, and full data tables
+     fold behind "Show the table". Phone only; nothing is removed. */
+  function foldLong(host) {
+    if (!C) init();
+    Array.prototype.forEach.call(host.querySelectorAll('.card-foot'), function (f) {
+      if (f.closest('details')) return;
+      var text = (f.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text.split(' ').length <= 35) return;
+      var m = text.match(/^.+?[.!?](?=\s+["“(]?[A-Z0-9])/);
+      if (!m || m[0].length > 0.75 * text.length) return;
+      var lead = document.createElement('div');
+      lead.className = 'card-foot note-lead';
+      lead.textContent = m[0];
+      var d = document.createElement('details');
+      d.className = 'note-more';
+      d.innerHTML = '<summary>More about this</summary>';
+      f.parentNode.insertBefore(lead, f);
+      f.parentNode.insertBefore(d, f);
+      d.appendChild(f);
+      d.addEventListener('toggle', function () { lead.hidden = d.open; });
+    });
+    /* Cards that are mostly prose (the Brief): keep the opening paragraph,
+       fold the rest behind one tap. */
+    Array.prototype.forEach.call(host.querySelectorAll('.card'), function (c) {
+      var ps = Array.prototype.filter.call(c.querySelectorAll(':scope > p, :scope > div > p'),
+        function (p) { return !p.closest('details') && !/card-note|note-lead/.test(p.className); });
+      var words = ps.reduce(function (n, p) {
+        return n + (p.textContent || '').split(/\s+/).length; }, 0);
+      if (ps.length < 3 || words < 200) return;
+      /* everything after the opening paragraph in its container -
+         subheadings included, so none is left stranded above the fold */
+      var first = ps[0], rest = [];
+      for (var n = first.nextSibling; n; n = n.nextSibling) rest.push(n);
+      var paras = rest.filter(function (x) { return x.nodeName === 'P'; }).length;
+      if (paras < 2) return;
+      var d = document.createElement('details');
+      d.className = 'note-more';
+      d.innerHTML = '<summary>Read the rest (' + paras + ' more paragraphs)</summary>';
+      first.parentNode.insertBefore(d, first.nextSibling);
+      rest.forEach(function (x) { d.appendChild(x); });
+    });
+    Array.prototype.forEach.call(host.querySelectorAll('.tbl-wrap'), function (w) {
+      if (w.closest('details')) return;
+      var rows = w.querySelectorAll('tbody tr').length;
+      if (rows < 6) return;
+      var d = document.createElement('details');
+      d.className = 'note-more tbl-fold';
+      d.innerHTML = '<summary>Show the table (' + rows + ' rows)</summary>';
+      w.parentNode.insertBefore(d, w);
+      d.appendChild(w);
+    });
+  }
+
+  root.GRA.ui = { card: card, foldLong: foldLong, table: table, h: h, seg: seg, stat: stat,
                   afterLayout: afterLayout, flagChip: flagChip };
 }(this));
