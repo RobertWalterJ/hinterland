@@ -174,17 +174,30 @@
      the line ends, 13px type, the 2011 point hollow, the counting seam as a
      dashed rule. */
   function indexChart(host, place, sr, phone) {
-    var ys = sr.years;
-    var base = tot(sr.vecs[ys[0]]);
-    var onBase = tot(D.resVec('35', ys[0]));
-    var mine = ys.map(function (y) { return [y, 100 * tot(sr.vecs[y]) / base]; });
-    var ont = ys.map(function (y) {
-      var v = D.resVec('35', y); return v ? [y, 100 * tot(v) / onBase] : null;
-    }).filter(Boolean);
+    var ys = sr.years, a = {}, b = {};
+    ys.forEach(function (y) {
+      a[y] = tot(sr.vecs[y]);
+      var v = D.resVec('35', y); if (v) b[y] = tot(v);
+    });
+    return indexLines(host, { years: ys, mine: a, ont: b,
+      name: place.name.split(' / ')[0], hollow: [2011],
+      seam: ys.indexOf(2011) >= 0 && ys.indexOf(2016) >= 0 ? [2011, 2016] : null,
+      what: 'working residents', dots: true }, phone);
+  }
+
+  /* Two lines indexed to their first year = 100: this place and Ontario.
+     Shared with the Population screen. */
+  function indexLines(host, o, phone) {
+    var ys = o.years;
+    var base = o.mine[ys[0]], onBase = o.ont[ys[0]];
+    var mine = ys.map(function (y) { return [y, 100 * o.mine[y] / base]; });
+    var ont = ys.filter(function (y) { return o.ont[y] != null; })
+      .map(function (y) { return [y, 100 * o.ont[y] / onBase]; });
+    var place = { name: o.name };
     var w = host.clientWidth || (phone ? 340 : 620), h = phone ? 230 : 260;
     var padL = 44, padR = phone ? 96 : 120, padT = 18, padB = 34;
     var svg = el('svg', { viewBox: '0 0 ' + w + ' ' + h, width: '100%', role: 'img',
-      class: 'chg-chart', 'aria-label': 'Working residents, indexed to ' + ys[0] + ' = 100' });
+      class: 'chg-chart', 'aria-label': o.what + ', indexed to ' + ys[0] + ' = 100' });
     var all = mine.concat(ont).map(function (p) { return p[1]; });
     var lo = Math.min.apply(null, all.concat([100])), hi = Math.max.apply(null, all.concat([100]));
     var pad = Math.max(3, (hi - lo) * 0.12);
@@ -195,19 +208,21 @@
       el('line', { x1: padL, x2: w - padR, y1: Y(t), y2: Y(t), class: t === 100 ? 'chg-base' : 'chg-grid' }, svg);
       el('text', { x: padL - 8, y: Y(t) + 4.5, 'text-anchor': 'end', class: 'chg-ax' }, svg).textContent = t;
     });
-    ys.forEach(function (y) {
+    var tickYs = ys.length <= 6 ? ys : ys.filter(function (y) { return y % 5 === 0; });
+    tickYs.forEach(function (y) {
       el('text', { x: X(y), y: h - 10, 'text-anchor': 'middle', class: 'chg-ax' }, svg).textContent = y;
     });
-    if (ys.indexOf(2011) >= 0 && ys.indexOf(2016) >= 0) {
-      var sx = (X(2011) + X(2016)) / 2;
+    if (o.seam) {
+      var sx = (X(o.seam[0]) + X(o.seam[1])) / 2;
       el('line', { x1: sx, x2: sx, y1: padT, y2: h - padB, class: 'chg-seam' }, svg);
     }
     function line(pts, cls, label) {
       el('polyline', { points: pts.map(function (p) { return X(p[0]) + ',' + Y(p[1]); }).join(' '),
                        class: 'chg-line ' + cls }, svg);
-      pts.forEach(function (p) {
+      pts.forEach(function (p, i) {
+        if (!o.dots && i !== pts.length - 1) return;
         el('circle', { cx: X(p[0]), cy: Y(p[1]), r: 4.5,
-                       class: 'chg-dot ' + cls + (p[0] === 2011 ? ' is-hollow' : '') }, svg);
+                       class: 'chg-dot ' + cls + ((o.hollow || []).indexOf(p[0]) >= 0 ? ' is-hollow' : '') }, svg);
       });
       var last = pts[pts.length - 1];
       el('text', { x: X(last[0]) + 10, y: Y(last[1]) + 4.5, class: 'chg-lab ' + cls }, svg)
@@ -218,7 +233,7 @@
     host.appendChild(svg);
     /* the chart, said in words - read-aloud skips pictures */
     var m1 = mine[mine.length - 1][1], o1 = ont.length ? ont[ont.length - 1][1] : null;
-    return 'For every 100 working residents in ' + ys[0] + ', there were ' +
+    return 'For every 100 ' + o.what + ' in ' + ys[0] + ', there were ' +
       Math.round(m1) + ' in ' + ys[ys.length - 1] + (o1 != null ? '; across Ontario, ' +
       Math.round(o1) + '.' : '.');
   }
@@ -383,6 +398,9 @@
     if (A.state.changeOpen) { d.open = true; built = true; why(inner); }
     host.appendChild(d);
   }
+
+  root.GRA = root.GRA || {};
+  root.GRA.chgCharts = { indexLines: function (host, o, phone) { init(); return indexLines(host, o, phone); } };
 
   function attach() {
     var P = root.GRA.panels;

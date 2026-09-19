@@ -452,6 +452,44 @@
      says which one, because a municipality is not its census division. */
   D.componentsFor = function (place) {
     if (!D.components) return null;
+    /* An economic region is made of whole census divisions, and Ontario of
+       all of them, so their components are SUMS of division components -
+       exact, because every component is a count. (Moves between divisions
+       inside a region cancel in the sum, which is what "net migration within
+       Ontario" should mean for the region.) Metro areas cut across divisions
+       and get none. */
+    if (place.level === 'ER' || place.level === 'PR') {
+      var cds = {};
+      if (place.level === 'PR') {
+        Object.keys(D.components.data).forEach(function (v) {
+          Object.keys(D.components.data[v]).forEach(function (c) { cds[c] = 1; });
+        });
+      } else {
+        D.membersOf('ER', place).forEach(function (c) {
+          var q = D.byCode[c]; if (q && q.cd) cds[q.cd] = 1;
+        });
+      }
+      var list = Object.keys(cds);
+      if (!list.length) return null;
+      var sum = { cd: null, cdName: place.name.split(' / ')[0], summed: list.length,
+                  series: {} };
+      Object.keys(D.components.data).forEach(function (v) {
+        var acc = null;
+        list.forEach(function (c) {
+          var byYear = D.components.data[v][c];
+          if (!byYear) return;
+          acc = acc || {};
+          Object.keys(byYear).forEach(function (y) {
+            var dst = acc[y] = acc[y] || {};
+            Object.keys(byYear[y]).forEach(function (k) {
+              dst[k] = (dst[k] || 0) + (byYear[y][k] || 0);
+            });
+          });
+        });
+        if (acc) sum.series[v] = acc;
+      });
+      return Object.keys(sum.series).length ? sum : null;
+    }
     var cd = place.level === 'CD' ? place.code : place.cd;
     if (!cd) return null;
     var out = { cd: cd, cdName: D.geo.cd_names[cd] || cd, series: {} };
@@ -459,6 +497,24 @@
       if (D.components.data[v][cd]) out.series[v] = D.components.data[v][cd];
     });
     return Object.keys(out.series).length ? out : null;
+  };
+
+  /* Annual population for any place: published for municipalities, Ontario
+     and Canada; SUMMED from municipalities (on 2021 boundaries, so exact)
+     for divisions, regions and metro areas, which had no line at all. */
+  D.popSeries = function (place) {
+    if (!D.pop || !D.pop.data) return null;
+    if (D.pop.data[place.code]) return D.pop.data[place.code];
+    var mem = D.membersOf(place.level, place);
+    if (!mem.length) return null;
+    var out = {}, n = 0;
+    mem.forEach(function (c) {
+      var s = D.pop.data[c];
+      if (!s) return;
+      n++;
+      Object.keys(s).forEach(function (y) { out[y] = (out[y] || 0) + (s[y] || 0); });
+    });
+    return n ? out : null;
   };
 
   /* ------------------------------------------------------- occupation */

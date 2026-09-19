@@ -42,8 +42,26 @@
     var afterLayout = U.afterLayout;
     var place = ctx.place;
 
-    /* ---------------------------------------- the municipal series */
-    var pp = D.pop.data[place.code];
+    /* ---------------------------------------- the answer, first */
+    var pp = D.popSeries(place);
+    var comp = D.componentsFor(place);
+    host.appendChild(answerCard(place, pp, comp));
+    if (pp && D.pop.data['35'] && place.code !== '35') {
+      var cI = card('Population against Ontario', null);
+      var ih = document.createElement('div');
+      ih.className = 'chg-host';
+      cI.appendChild(ih);
+      host.appendChild(cI);
+      var yrsI = Object.keys(pp).map(Number).sort(function (a, b) { return a - b; });
+      afterLayout(function () {
+        var said = root.GRA.chgCharts.indexLines(ih, { years: yrsI, mine: pp,
+          ont: D.pop.data['35'], name: place.name.split(' / ')[0], what: 'residents',
+          dots: false }, phone);
+        cI.appendChild(h('<p class="chart-says" data-read>' + C.esc(said) + '</p>'));
+      });
+    }
+
+    /* ---------------------------------------- the numbers */
     if (pp) {
       var years = Object.keys(pp).map(Number)
         .sort(function (a, b) { return a - b; });
@@ -51,7 +69,7 @@
       var first = pp[y0], last = pp[y1];
       var cagr = Math.pow(last / first, 1 / (y1 - y0)) - 1;
 
-      var c = card('Population, ' + y0 + ' to ' + y1,
+      var c = card('The numbers, ' + y0 + ' to ' + y1,
         'Statistics Canada annual estimates, harmonised onto 2021 boundaries. ' +
         'These are adjusted for census net undercoverage, so they deliberately ' +
         'do not match census counts, and the most recent year is preliminary.');
@@ -63,16 +81,6 @@
              last >= first ? 'pos' : 'neg') +
         stat(C.signedPct(cagr), 'a year, compounded') +
         '</div>'));
-      var ph = document.createElement('div');
-      ph.style.minHeight = '200px';
-      c.appendChild(ph);
-      afterLayout(function () {
-        /* named so it does not announce as an unnamed graphic */
-        C.lines(ph, [{ name: 'population', color: C.cssVar('--gain'),
-                       points: years.map(function (y) { return [y, pp[y]]; }) }],
-                { zeroBased: false,
-                  xTicks: years.filter(function (y) { return y % 5 === 0; }) });
-      });
       c.appendChild(h('<div class="card-foot">The municipal series begins in ' +
         '2001, and that is not an oversight. There is no boundary-harmonised ' +
         'municipal population series before it, and raw counts either side of ' +
@@ -86,18 +94,18 @@
     }
 
     /* ------------------------------------- components of change */
-    var comp = D.componentsFor(place);
     if (!comp) {
-      host.appendChild(card('No components of change for this geography',
-        'Statistics Canada publishes births, deaths and migration by census ' +
-        'division and no finer. Choose a municipality, census division or ' +
-        'economic region and this fills in.'));
+      host.appendChild(card('Births, deaths and moves',
+        'Statistics Canada publishes these by census division. A metro area ' +
+        'cuts across divisions, so they cannot be added up for it: choose one ' +
+        'of its municipalities or divisions to see them.'));
       return;
     }
 
-    var isCD = place.level === 'CD';
-    var cc = card('Why it changed — ' + C.esc(comp.cdName) +
-      (isCD ? '' : ' (census division)'),
+    var isCD = place.level === 'CD' || !!comp.summed;
+    var cc = card('Why it changed: births, deaths and moves' +
+      (isCD ? '' : ' (' + C.esc(comp.cdName) + ')'),
+      (comp.summed ? 'Added up from its ' + comp.summed + ' census divisions. ' : '') +
       (isCD ? '' : '<b>This is the census division, not ' +
         C.esc(place.name) + '.</b> Components of change are not published ' +
         'below this level, so a fast-growing municipality inside a ' +
@@ -201,6 +209,81 @@
       'here.</div>'));
     if (root.GRA.learn) root.GRA.learn.teach(cc, ['components', 'natural-increase'], null);
     host.appendChild(cc);
+  }
+
+  /* "Is it growing?", answered in plain sentences before anything else. */
+  function answerCard(place, pp, comp) {
+    var name = C.esc(place.name.split(' / ')[0]);
+    var lines = [];
+    if (pp) {
+      var ys = Object.keys(pp).map(Number).sort(function (a, b) { return a - b; });
+      var y0 = ys[0], y1 = ys[ys.length - 1], first = pp[y0], last = pp[y1];
+      var g = (last - first) / first;
+      var on = D.pop.data['35'];
+      var go = place.code !== '35' && on && on[y0] && on[y1] ? (on[y1] - on[y0]) / on[y0] : null;
+      /* the census count and the estimate are both shown, with why they
+         differ - Home said 108,843 (census) and this screen 117,671 (2025) */
+      lines.push('About <b>' + C.fmt(Math.round(last / 100) * 100) + '</b> people live in ' +
+        name + ' (Statistics Canada\u2019s estimate for ' + y1 + ')' +
+        (place.pop2021 ? '. The 2021 Census counted ' + C.fmt(place.pop2021) +
+          '; estimates add the people a census misses.' : '.'));
+      var pace = go == null ? '' : Math.abs(g - go) < 0.02 ? ', about the same pace as Ontario'
+        : g > go ? ', faster than Ontario' : ', slower than Ontario';
+      lines.push('Since ' + y0 + ' it has ' + (g >= 0 ? 'grown ' : 'shrunk ') +
+        Math.abs(Math.round(g * 100)) + '%' + pace +
+        (go != null ? ' (Ontario ' + (go >= 0 ? '+' : '') + Math.round(go * 100) + '%)' : '') + '.');
+      /* a turning point, if the path changed direction clearly */
+      var minY = ys[0], maxY = ys[0];
+      ys.forEach(function (y) { if (pp[y] < pp[minY]) minY = y; if (pp[y] > pp[maxY]) maxY = y; });
+      if (minY !== y0 && minY !== y1 && pp[minY] < 0.98 * Math.max(first, last) &&
+          last > 1.02 * pp[minY]) {
+        var peakBefore = ys.filter(function (y) { return y < minY; })
+          .reduce(function (m, y) { return pp[y] > pp[m] ? y : m; }, y0);
+        lines.push('It shrank from ' + peakBefore + ' to ' + minY + ', then grew again.');
+      } else if (maxY !== y0 && maxY !== y1 && last < 0.98 * pp[maxY]) {
+        lines.push('It grew until ' + maxY + ' and has shrunk since.');
+      }
+    }
+    if (comp) {
+      var latest = comp.series['2021b'] ? '2021b' : Object.keys(comp.series).sort().pop();
+      var rows = D.componentSummary(comp.series[latest], latest).slice(-5);
+      if (rows.length) {
+        var avg = {};
+        ['natural', 'international', 'intraprovincial', 'interprovincial'].forEach(function (k) {
+          avg[k] = rows.reduce(function (a, r) { return a + r[k]; }, 0) / rows.length;
+        });
+        var gains = Object.keys(avg).filter(function (k) { return avg[k] > 0; })
+          .sort(function (a, b) { return avg[b] - avg[a]; });
+        var where = comp.summed || place.level === 'CD' ? '' :
+          ' (figures for ' + C.esc(comp.cdName) + ', its census division)';
+        if (gains.length) {
+          lines.push('In recent years most of the growth came from <b>' + NAME[gains[0]] +
+            '</b>' + (avg.natural < 0 ? ', while more people died than were born' : '') +
+            where + '.');
+        } else {
+          lines.push('In recent years every source of people has been negative' + where + '.');
+        }
+      }
+    }
+    /* people and work together, 2016 to 2021 */
+    if (pp && pp[2016] && pp[2021] && place.level === 'CSD') {
+      var a = D.resVec(place.code, 2016), b = D.resVec(place.code, 2021);
+      if (a && b) {
+        var gp = (pp[2021] - pp[2016]) / pp[2016];
+        var gw = (M.sum(b) - M.sum(a)) / M.sum(a);
+        var sdw = M.changeSd(a, b) / M.sum(a);
+        if (Math.abs(gp - gw) > Math.max(0.03, 2 * sdw)) {
+          lines.push('From 2016 to 2021 the population ' + (gp >= 0 ? 'grew ' : 'fell ') +
+            Math.abs(Math.round(gp * 100)) + '% while working residents ' +
+            (gw >= 0 ? 'grew ' : 'fell ') + Math.abs(Math.round(gw * 100)) + '%.');
+        }
+      }
+    }
+    var c = U.card(null, null, { className: 'chg-answer' });
+    c.innerHTML = '<h2 class="screen-q">Is it growing?</h2>' + (lines.length
+      ? lines.map(function (l) { return '<p class="answer-p">' + l + '</p>'; }).join('')
+      : '<p class="answer-p">Statistics Canada publishes no population series for this place.</p>');
+    return c;
   }
 
   function attach() {
