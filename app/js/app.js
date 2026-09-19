@@ -27,7 +27,10 @@
     peerFeatures: null,
     peerPinned: [],
     peerRemoved: [],
-    peerMode: 'similar'          /* similar | structural */
+    peerMode: 'similar',         /* similar | structural */
+    started: false,              /* has the reader chosen a place yet? */
+    homeView: 'jobs',            /* jobs | people, on the home answer */
+    mapVar: null
   };
 
   var PEER_FEATURES = [
@@ -42,7 +45,7 @@
   A.PEER_FEATURES = PEER_FEATURES;
 
   var TABS = [
-    { id: 'overview', label: 'Overview' },
+    { id: 'overview', label: 'Home' },
     { id: 'structure', label: 'Structure' },
     { id: 'change', label: 'Change' },
     { id: 'peers', label: 'Peers' },
@@ -136,7 +139,11 @@
     A.recent = A.recent || [];
     if (location.hash.length > 1) {
       var h = new URLSearchParams(location.hash.slice(1));
-      if (h.get('p')) A.state.place = h.get('p');
+      if (h.get('p')) {
+        /* a link to a particular place lands on its answer, not the question */
+        if (h.get('p') !== A.state.place) A.state.started = true;
+        A.state.place = h.get('p');
+      }
       if (h.get('b')) A.state.benchmark = h.get('b');
       if (h.get('t')) A.state.tab = h.get('t');
     }
@@ -257,6 +264,7 @@
   A.setPlace = function (code) {
     if (!D.byCode[code]) return;
     A.state.place = code;
+    A.state.started = true;
     A.recent = [code].concat((A.recent || []).filter(function (c) {
       return c !== code;
     }));
@@ -287,6 +295,9 @@
       D.loadTracts().then(A.render);
     }
     A.render();
+    /* a new place starts at the top of its answer, wherever it was chosen */
+    var mainEl = document.querySelector('main');
+    if (mainEl) mainEl.scrollTop = 0;
   };
 
   A.setBenchmark = function (id) {
@@ -634,6 +645,7 @@
        page that is no longer on screen, with no control left to stop it. */
     if (root.GRA.read) root.GRA.read.stop();
     host.innerHTML = '';
+    document.body.classList.remove('is-landing');
     try {
       fn(host, ctx, phone);
       if (phone && root.GRA.ui.foldLong) root.GRA.ui.foldLong(host);

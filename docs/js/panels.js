@@ -196,12 +196,12 @@
 
   /* ===================================================== 1. OVERVIEW */
 
-  /* On a phone the overview opens on the home screen (home.js): where you
-     are, what people do here, and the next questions. This full overview is
-     still there, one tap down, built only when opened. */
+  /* The overview opens on the home screen (home.js): the question "what do
+     people do here?", its answer, and the next questions. This full overview
+     is still there, one tap down, built only when opened. */
   P.overview = function (host, ctx, phone) {
     init();
-    if (phone && root.GRA.home) {
+    if (root.GRA.home) {
       root.GRA.home.render(host, ctx, function (inner) {
         overviewFull(inner, ctx, phone, true);
       });
@@ -1620,7 +1620,7 @@
         vals[c] = doingGroupOf(D.workVec(c, 'total'));
       });
       type = 'cat';
-      title = 'What most people here do';
+      title = 'The biggest kind of work in each place';
       fmt = function (v) {
         return (v == null || !DOING[v]) ? 'no published figure' : DOING[v].label;
       };
@@ -1691,8 +1691,8 @@
       : mapNote(st.mapVar) +
         ' Tap any municipality to see what people do there, then open the ' +
         'full analysis.');
-    var mh = h('<div class="mapbox" style="height:' + (phone ? 400 : 620) +
-      'px"></div>');
+    var mh = h('<div class="mapbox" style="height:' +
+      (phone ? 'max(360px, 58svh)' : '620px') + '"></div>');
     cMap.appendChild(mh);
 
     /* Browsing is a different act from committing. A click previews the
@@ -1701,7 +1701,9 @@
     /* The peek IS the answer to the question the panel asks, and it is
        written in after a click rather than being on the page. Without a
        live region it lands silently. */
-    var peek = h('<div id="mapPeek" role="status" aria-live="polite"></div>');
+    var peek = h('<div id="mapPeek" role="status" aria-live="polite">' +
+      '<p class="peek-hint">Tap any place on the map to see what people do ' +
+      'there.</p></div>');
     cMap.appendChild(peek);
     host.appendChild(cMap);
 
@@ -1725,11 +1727,11 @@
         var ranked = D.naics.map(function (n, i) {
           return { i: i, n: n, v: vec[i] || 0 };
         }).sort(function (a, b) { return b.v - a.v; });
-        sentence = 'Most people working here are in ' +
-          ranked.slice(0, 3).map(function (r) {
-            return '<b>' + C.esc(r.n.short.toLowerCase()) + '</b> (' +
-              C.pct(r.v / tot, 0) + ')';
-          }).join(', ') + '.';
+        var LRn = root.GRA.learn;
+        sentence = LRn ? LRn.orderSentence(ranked.map(function (r) {
+            return { label: r.n.short, n: r.v, share: r.v / tot };
+          }), function (x) { return M.countSd(x.n); }, 'the jobs located here')
+          : '';
 
         var stand = M.locationQuotients(vec, onVec).filter(function (r) {
           return r.lq != null && r.lq >= 1.4 && r.flag === 'ok';
@@ -1761,8 +1763,8 @@
         (p.cd && D.geo.cd_names[p.cd]
           ? ' · ' + C.esc(D.geo.cd_names[p.cd]) : '') + '</div></div>' +
         '<button class="btn btn-primary" data-open="' + code + '">' +
-        (isSubject ? 'Open full analysis' : 'Open ' + C.esc(p.name)) +
-        '</button></div>' +
+        'See the full answer</button></div>' +
+        '<div class="peek-q">What do people do here?</div>' +
         '<div class="peek-answer">' + sentence + '</div>' +
         distinct + bar +
         '<div class="peek-stats">' +
@@ -1790,7 +1792,13 @@
       D.loadBoundaries('csd').then(function (fc) {
         var mp = root.GRA.map.create(mh, {
           layer: 'csd',
-          onPick: function (code) { mp.select(code); showPeek(code); }
+          onPick: function (code) {
+            mp.select(code); showPeek(code);
+            /* on a phone the preview sits under the map: bring it up */
+            if (phone) {
+              try { peek.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+            }
+          }
         });
         mapRef.mp = mp;
         mp.labelFor = function (id) {
@@ -1800,6 +1808,27 @@
         mp.setData(vals, { type: type, title: title, fmt: fmt,
                            categories: st.mapVar === 'flows' ? [] : DOING });
         if (ctx.place.level === 'CSD') mp.select(ctx.place.code);
+        /* On a phone the whole province leaves southern Ontario too small to
+           tap. Start on the place and its census division - "the places
+           around it" - with the full view one button away. */
+        if (phone && !flowLines && ctx.place.level === 'CSD') {
+          /* the places within reach: widen the circle until it holds a
+             handful of neighbours, so a city and a township both open on
+             something worth tapping */
+          var me0 = ctx.place, near = [];
+          [30, 45, 70, 110, 180].some(function (km) {
+            near = D.csdCodes.filter(function (c) {
+              var q = D.byCode[c];
+              if (!q || q.lat == null || me0.lat == null) return false;
+              var dy = (q.lat - me0.lat) * 111;
+              var dx = (q.lon - me0.lon) * 111 * Math.cos(me0.lat * Math.PI / 180);
+              return dx * dx + dy * dy <= km * km;
+            });
+            return near.length >= 8;
+          });
+          mp.fitToCodes(near.length > 1 ? near : [ctx.place.code]);
+          showPeek(ctx.place.code);
+        }
         if (flowLines && flowLines.length) {
           mp.setFlows(flowLines);
           mp.legendEl.hidden = true;

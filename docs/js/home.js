@@ -43,6 +43,7 @@
     commute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="18" r="2.2"/><circle cx="19" cy="6" r="2.2"/><path d="M7 17c6-1 4-9 10-10"/></svg>',
     peers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="10" width="5" height="10" rx="1"/><rect x="10" y="6" width="5" height="14" rx="1"/><rect x="17" y="11" width="4" height="9" rx="1"/></svg>',
     learn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/></svg>',
+    map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3L3 5.5v15L9 18l6 3 6-2.5v-15L15 6 9 3z"/><path d="M9 3v15M15 6v15"/></svg>',
     arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'
   };
 
@@ -198,7 +199,23 @@
     }
     var view = A.state.homeView === 'people' && people ? 'people' : 'jobs';
 
-    var c = U.card('What do people do here?', null, { className: 'home-card' });
+    var p = ctx.place;
+    var c = U.card(null, null, { className: 'home-card home-ask' });
+    var located = A.state.located && A.state.located.code === p.code;
+    c.innerHTML =
+      '<div class="eyebrow">' + (located ? 'Where you are' : esc(p.kind) +
+        (p.level === 'CSD' && p.cd && D.geo.cd_names[p.cd]
+          ? ' · ' + esc(D.geo.cd_names[p.cd]) : '')) + '</div>' +
+      '<h1 class="home-q1">What do people do in ' +
+        '<button type="button" class="place-link" data-act="pick" ' +
+        'aria-label="' + esc(placeName(p)) + '. Tap to choose another place">' +
+        esc(placeName(p)) + '</button>?</h1>' +
+      (located && A.state.located.nearEdge
+        ? '<p class="home-small">You are close to a boundary, so this might be ' +
+          'the place next door.</p>' : '');
+    c.addEventListener('click', function (e) {
+      if (e.target.closest('[data-act="pick"]')) A.openPlacePicker();
+    });
     if (jobs && people) {
       var seg = document.createElement('div');
       seg.className = 'home-seg';
@@ -272,11 +289,11 @@
         go: 'map', map: 'flows', ok: p.level === 'CSD' && !!ctx.commute },
       { icon: 'peers', q: 'Which places are like it?', a: 'Compare with its peers',
         go: 'peers', ok: p.level === 'CSD' || p.level === 'CT' },
-      { icon: 'learn', q: 'Test yourself', a: 'A short quiz, no timer',
-        go: 'learn', ok: true }
+      { icon: 'map', q: 'What about the places around it?', a: 'Explore Ontario on the map',
+        go: 'map', map: 'doing', ok: true }
     ].filter(function (x) { return x.ok; });
 
-    var c = U.card('Find out more', null, { className: 'home-card' });
+    var c = U.card('Dig deeper', null, { className: 'home-card' });
     var list = document.createElement('div');
     list.className = 'home-qs';
     list.innerHTML = qs.map(function (x, i) {
@@ -299,58 +316,132 @@
     return c;
   }
 
-  H.render = function (host, ctx, full) {
-    init();
-    var p = ctx.place;
+  function placeName(p) {
+    return String(p.level === 'CT' ? D.tractLabel(p.code).title : p.name)
+      .split(' / ')[0];
+  }
 
-    /* 1. where */
-    var w = U.card(null, null, { className: 'home-card home-where' });
-    var located = A.state.located && A.state.located.code === p.code;
-    w.innerHTML =
-      '<div class="eyebrow">' + (located ? 'You are in' : esc(p.kind)) + '</div>' +
-      '<h2 class="home-name">' +
-        esc(p.level === 'CT' ? D.tractLabel(p.code).title : p.name) + '</h2>' +
-      (located && A.state.located.nearEdge
-        ? '<p class="home-small">You are close to a boundary, so this might be ' +
-          'the place next door. Check the name.</p>' : '') +
-      '<div class="home-actions">' +
-        '<button type="button" class="btn btn-primary home-btn" data-act="here">' +
-          ICON.pin + '<span>Use where I am</span></button>' +
-        '<button type="button" class="btn home-btn" data-act="pick">' +
-          ICON.search + '<span>Choose a place</span></button>' +
+  /* The ways to say "here": typing a name is the main one; the phone's
+     position and the map sit beside it, smaller. */
+  function otherWays(el) {
+    var geo = 'geolocation' in navigator;
+    el.innerHTML =
+      '<button type="button" class="home-search" data-act="pick">' +
+        ICON.search + '<span>Type a place name</span></button>' +
+      '<div class="home-links">' +
+        (geo ? '<button type="button" class="linkbtn home-link" data-act="here">' +
+          ICON.pin + '<span>Use where I am</span></button>' : '') +
+        '<button type="button" class="linkbtn home-link" data-act="map">' +
+          ICON.map + '<span>Explore the map</span></button>' +
       '</div>' +
       '<div class="home-msg" hidden role="status" aria-live="polite"></div>';
-    var msg = w.querySelector('.home-msg');
-    w.addEventListener('click', function (e) {
+    var msg = el.querySelector('.home-msg');
+    el.addEventListener('click', function (e) {
       var b = e.target.closest('[data-act]');
       if (!b) return;
-      if (b.getAttribute('data-act') === 'here') H.locate(msg, b);
-      else A.openPlacePicker();
+      var act = b.getAttribute('data-act');
+      if (act === 'pick') A.openPlacePicker();
+      else if (act === 'here') H.locate(msg, b);
+      else if (act === 'map') {
+        A.state.mapVar = 'doing';
+        A.go('map');
+        try { window.scrollTo(0, 0); } catch (err) {}
+      }
     });
-    host.appendChild(w);
+  }
 
-    if (!ctx.local || !ctx.ref) return false;
+  /* First visit: nothing but the question and a way to say where. */
+  function landing(host) {
+    var c = U.card(null, null, { className: 'home-card home-landing' });
+    c.innerHTML = '<h1 class="home-q1">What do people do here?</h1>' +
+      '<p class="home-lede">Pick any place in Ontario to find out what work ' +
+      'is there, and what the people who live there do.</p>';
+    var ways = document.createElement('div');
+    otherWays(ways);
+    c.appendChild(ways);
+    var tries = ['3525005', '3553005', '3537039', '3510010', '3558004']
+      .filter(function (k) { return D.byCode[k]; });
+    if (tries.length) {
+      var t = document.createElement('div');
+      t.className = 'home-try';
+      t.innerHTML = '<span>Or try</span>' + tries.map(function (k) {
+        return '<button type="button" class="home-chip" data-code="' + k + '">' +
+          esc(placeName(D.byCode[k])) + '</button>';
+      }).join('');
+      t.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-code]');
+        if (b) A.setPlace(b.getAttribute('data-code'));
+      });
+      c.appendChild(t);
+    }
+    host.appendChild(c);
+  }
 
-    /* 2. the answer */
-    host.appendChild(doing(ctx));
-    var g = glance(ctx);
-    if (g) host.appendChild(g);
+  H.render = function (host, ctx, full) {
+    init();
+    var col = document.createElement('div');
+    col.className = 'home-col';
+    host.appendChild(col);
 
-    /* 3. the next questions */
-    host.appendChild(nextQuestions(ctx));
+    if (!A.state.started) {
+      /* nothing chosen yet: the place and export controls have nothing to say */
+      document.body.classList.add('is-landing');
+      landing(col);
+      return true;
+    }
 
-    /* everything else, built only when asked for */
-    var more = document.createElement('details');
-    more.className = 'home-more';
-    more.innerHTML = '<summary>All the numbers for ' + esc(p.name) + '</summary>';
-    var inner = document.createElement('div');
-    inner.className = 'grid';
-    more.appendChild(inner);
-    var built = false;
-    more.addEventListener('toggle', function () {
-      if (more.open && !built) { built = true; full(inner); }
+    var p = ctx.place;
+    if (!ctx.local || !ctx.ref) {
+      var none = U.card(null, null, { className: 'home-card' });
+      none.innerHTML = '<h1 class="home-q1">What do people do in ' +
+        esc(placeName(p)) + '?</h1><p class="home-lede">Statistics Canada ' +
+        'published no industry figures here: too few workers to report ' +
+        'without identifying people.</p>';
+      col.appendChild(none);
+    } else {
+      /* 1. the answer, headed by the question */
+      col.appendChild(doing(ctx));
+      var g = glance(ctx);
+      if (g) col.appendChild(g);
+
+      /* 2. the next questions, each opening the screen that answers it */
+      col.appendChild(nextQuestions(ctx));
+
+      /* 3. everything else, built only when asked for */
+      var more = document.createElement('details');
+      more.className = 'home-more';
+      more.innerHTML = '<summary>All the numbers for ' + esc(placeName(p)) +
+        '</summary>';
+      var inner = document.createElement('div');
+      inner.className = 'grid';
+      more.appendChild(inner);
+      var built = false;
+      more.addEventListener('toggle', function () {
+        if (more.open && !built) { built = true; full(inner); }
+      });
+      host.appendChild(more);
+    }
+
+    /* 4. somewhere else - at the foot, where it belongs */
+    var w = U.card('Somewhere else?', null, { className: 'home-card home-else' });
+    var ways = document.createElement('div');
+    otherWays(ways);
+    w.appendChild(ways);
+    var wc = document.createElement('div');
+    wc.className = 'home-col';
+    wc.appendChild(w);
+    host.appendChild(wc);
+
+    /* 5. the learning side, one quiet line */
+    var lr = document.createElement('p');
+    lr.className = 'home-learnline';
+    lr.innerHTML = 'Want to learn how this works? <button type="button" ' +
+      'class="linkbtn" data-go="learn">Methods, history and a quiz</button>';
+    lr.querySelector('[data-go]').addEventListener('click', function () {
+      A.go('learn');
+      try { window.scrollTo(0, 0); } catch (err) {}
     });
-    host.appendChild(more);
+    host.appendChild(lr);
     return true;
   };
 
