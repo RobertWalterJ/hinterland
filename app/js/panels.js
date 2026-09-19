@@ -421,8 +421,8 @@
     var u = ctx.change.uncertainty;
     var sig = Math.abs(t.competitive) > 2 * u;
     if (!sig) {
-      return 'The competitive effect is within the noise that census rounding ' +
-        'alone can produce (about ±' + C.fmt(2 * u) + ' jobs). Treat it as ' +
+      return 'The competitive effect is within the noise that census sampling ' +
+        'and rounding can produce (about ±' + C.fmt(Math.round(2 * u)) + ' working residents). Treat it as ' +
         'no measurable local advantage or disadvantage either way.';
     }
     return t.competitive > 0
@@ -910,9 +910,9 @@
       '<span class="flag flag-' + (exact ? 'ok' : 'withheld') + '">' +
       (exact ? 'identity holds' : 'identity off by ' + ch.identity.toFixed(2)) +
       '</span> Components sum to the observed change of ' + C.signed(t.actual) +
-      ' jobs' + (exact ? ' exactly' : '') + '. ' +
-      'Census rounding alone can move any one component by roughly ±' +
-      C.fmt(2 * ch.uncertainty) + ' jobs, so treat anything smaller than that ' +
+      ' working residents' + (exact ? ' exactly' : '') + '. ' +
+      'Sampling and rounding can move any one component by roughly ±' +
+      C.fmt(Math.round(2 * ch.uncertainty)) + ', so treat anything smaller than that ' +
       'as no finding. ' + C.esc(ch.ref.note) +
       (ch.refFallback ? ' The chosen benchmark had no data for this period, so ' +
         'Ontario was used.' : '') + ' </div>');
@@ -1581,7 +1581,7 @@
     }
     host.appendChild(ctl);
 
-    var vals = {}, type = 'seq', fmt = C.fmt, title = '', mapBase = null;
+    var vals = {}, type = 'seq', fmt = C.fmt, title = '', mapBase = null, mapBand = null;
 
     var onVec = D.workVec('35', 'total');
     var onTot = M.sum(onVec);
@@ -1654,27 +1654,29 @@
       var y0 = ctx.change && ctx.change.y0 ? ctx.change.y0 : 2016;
       var y1 = ctx.change && ctx.change.y1 ? ctx.change.y1 : 2021;
       var r0 = D.resVec('35', y0), r1 = D.resVec('35', y1);
-      /* A rate needs a denominator big enough to carry it. The competitive
-         effect has a rounding uncertainty of about ±25 jobs at two standard
-         deviations, so expressed per 100 base jobs that is ±25/base×100: a
-         municipality with 250 workers carries ±10 per 100 and can top the
-         ranking on rounding alone. At 500 the band is ±5, which is small
-         relative to the spread being mapped. Below that the figure is not
-         withheld out of caution - it genuinely carries no signal. */
-      var MIN_BASE = 500;
-      mapBase = {};
+      /* A rate needs a denominator big enough to carry it, and a band. The
+         band is SAMPLING error as well as rounding (M.changeSd): the
+         residence tables are long-form samples, and the first version,
+         rounding only, put the band at ±5 per 100 for 500 workers when it is
+         nearer ±24. A shift inside its own band is shown as "about the same
+         as Ontario" (the neutral middle), not as a signed number the data
+         cannot support. */
+      var MIN_BASE = 1000;
+      mapBase = {}; mapBand = {};
       D.csdCodes.forEach(function (c) {
         var a = D.resVec(c, y0), b = D.resVec(c, y1);
         if (!a || !b || !r0 || !r1) { vals[c] = null; return; }
         var base = M.sum(a);
         if (base < MIN_BASE) { vals[c] = null; return; }
         var ss = M.shiftShare(a, b, r0, r1);
-        mapBase[c] = base;
-        vals[c] = ss.total.competitive / base * 100;
+        var band = 2 * M.changeSd(a, b) / base * 100;
+        var v = ss.total.competitive / base * 100;
+        mapBase[c] = base; mapBand[c] = band;
+        vals[c] = Math.abs(v) <= band ? 0 : v;
       });
       type = 'div';
       fmt = function (v) { return v == null ? '—' : C.signed(v, 1); };
-      title = 'Competitive shift ' + y0 + '–' + y1 + ', per 100 base jobs';
+      title = 'Competitive shift ' + y0 + '–' + y1 + ', per 100 working residents';
     } else {
       var mv = MAP_VARS.filter(function (v) { return v.id === st.mapVar; })[0]
         || MAP_VARS[1];
@@ -1949,11 +1951,11 @@
     /* A rate is unreadable without its denominator, so when the variable is a
        rate the denominator is a column rather than a footnote. */
     if (mapBase) {
-      cols.push({ key: 'base', label: 'Base-year labour force', dp: 0 });
-      cols.push({ key: 'band', label: 'Rounding band',
+      cols.push({ key: 'base', label: 'Working residents at the start', dp: 0 });
+      cols.push({ key: 'band', label: 'Uncertainty band',
                   render: function (r) {
-                    return r.base ? '±' + (2 * M.shiftShareUncertainty(20) /
-                      r.base * 100).toFixed(1) : '—';
+                    return mapBand && mapBand[r._id] != null
+                      ? "±" + mapBand[r._id].toFixed(1) : "—";
                   } });
     }
     cols.push({ key: 'jobs', label: 'Jobs' });
@@ -2004,12 +2006,12 @@
 
   function mapNote(v) {
     if (v === 'compshift') {
-      return 'Residence-basis labour force, scaled by base-year size so small ' +
-        'and large municipalities are comparable. Municipalities with fewer ' +
-        'than 500 workers at the start are excluded: below that, census ' +
-        'rounding alone moves the rate by more than ±5 per 100 base jobs and ' +
-        'the figure carries no signal. The table shows each municipality’s ' +
-        'rounding band alongside its rate.';
+      return 'Working residents (where people live), scaled by size so small ' +
+        'and large places compare. Places with fewer than 1,000 working ' +
+        'residents at the start are left out. Where a place’s shift is ' +
+        'within its own sampling band it is shown as about the same as ' +
+        'Ontario: a census sample cannot tell those apart. The table gives ' +
+        'each band.';
     }
     if (v === 'selfc' || v === 'ratio') {
       return 'From the 2021 commuting flows. The May 2021 reference week ' +

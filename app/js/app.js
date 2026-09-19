@@ -565,8 +565,16 @@
     out.ref = refP;
     if (!refP) { out.error = 'No reference economy is available for that period.'; return out; }
 
-    out.local0 = localAt(y0);
-    out.local1 = localAt(y1);
+    /* the pair on a balanced panel: the same member towns in both years */
+    var pair = D.resSeries(place, [y0, y1]);
+    out.local0 = pair.vecs[y0];
+    out.local1 = pair.vecs[y1];
+    if (pair.members) out.coverage = { used: pair.used, members: pair.members };
+    if (!out.local0 || !out.local1) {
+      out.error = 'Not enough of this area’s municipalities were published in both ' +
+        y0 + ' and ' + y1 + ' to compare them fairly.';
+      return out;
+    }
     out.result = M.estebanMarquillas(out.local0, out.local1, refP.v0, refP.v1);
 
     /* The identity is arithmetic, not an approximation, so it is checked and
@@ -576,20 +584,17 @@
     out.emIdentity = t.competitive - (t.emCompetitive + t.emAllocation);
 
     if (st.chain) {
-      var lby = {}, rby = {};
-      var usable = have.slice();
-      usable.forEach(function (y) {
-        var lv = localAt(y);
-        var rp = D.referencePeriod(st.benchmark, place, y, y,
-                                   { peerCodes: peerCodes(ctx) });
-        if (lv) lby[y] = lv;
-        if (rp) rby[y] = rp.v0;
-      });
-      var span = usable.filter(function (y) { return y >= y0 && y <= y1; });
-      out.dynamic = M.dynamicShiftShare(lby, rby, span);
+      /* balanced across the whole span, for the place and the benchmark */
+      var span = have.filter(function (y) { return y >= y0 && y <= y1; });
+      var ls = D.resSeries(place, span);
+      var rs = D.referencePeriod(st.benchmark, place, span[0], span[span.length - 1],
+                                 { peerCodes: peerCodes(ctx), years: span }) ||
+               D.referencePeriod('ON', place, span[0], span[span.length - 1], { years: span });
+      if (rs && rs.series) out.dynamic = M.dynamicShiftShare(ls.vecs, rs.series, span);
     }
 
-    out.uncertainty = M.shiftShareUncertainty(20);
+    /* one standard deviation of the change, from sampling and rounding */
+    out.uncertainty = M.changeSd(out.local0, out.local1);
     return out;
   }
 

@@ -345,13 +345,19 @@
   D.referencePeriod = function (kind, place, y0, y1, opt) {
     opt = opt || {};
     var peers = opt.peerCodes || [];
+    /* opt.years: balance across ALL these years, not just y0 and y1 - a
+       chained decomposition otherwise puts changes in membership into
+       "reference growth" */
+    var yrs = opt.years || [y0, y1];
 
     if (kind === 'ON' || kind === 'CA') {
       var code = kind === 'ON' ? '35' : 'CA';
       var a = D.resVec(code, y0), b = D.resVec(code, y1);
       if (!a || !b) return null;
+      var ser = {};
+      yrs.forEach(function (y) { var v = D.resVec(code, y); if (v) ser[y] = v; });
       return {
-        v0: a, v1: b, label: kind === 'ON' ? 'Ontario' : 'Canada',
+        v0: a, v1: b, label: kind === 'ON' ? 'Ontario' : 'Canada', series: ser,
         published: true, coverage: 1,
         note: 'Published Statistics Canada figures for both years.'
       };
@@ -363,19 +369,23 @@
     if (!codes.length) return null;
 
     var balanced = codes.filter(function (c) {
-      return D.hasRes(c, y0) && D.hasRes(c, y1);
+      return yrs.every(function (y) { return D.hasRes(c, y); });
     });
     if (!balanced.length) return null;
 
     var A = D.aggregate(balanced, function (c) { return D.resVec(c, y0); });
     var B = D.aggregate(balanced, function (c) { return D.resVec(c, y1); });
+    var series = {};
+    yrs.forEach(function (y) {
+      series[y] = D.aggregate(balanced, function (c) { return D.resVec(c, y); }).vec;
+    });
     var label = kind === 'PEERS'
       ? 'peer group (' + balanced.length + ' municipalities)'
       : ({ CD: D.geo.cd_names[place.cd], ER: D.geo.er_names[place.er],
            CMA: D.geo.cma_names[place.cma] })[kind] || kind;
 
     return {
-      v0: A.vec, v1: B.vec, label: label, published: false,
+      v0: A.vec, v1: B.vec, label: label, published: false, series: series,
       coverage: balanced.length / codes.length,
       contributors: balanced.length, expected: codes.length,
       note: balanced.length === codes.length
@@ -385,6 +395,32 @@
            '. Holding the set fixed keeps the reference growth rate honest; ' +
            'the excluded municipalities are listed in the export.')
     };
+  };
+
+  /* A place's residence-basis vectors over several years, on a BALANCED
+     panel: for a division, region or metro area, only the member
+     municipalities published in every one of the years are summed. Summing
+     whoever was published each year counted towns appearing in the data as
+     growth - Kenora's 2001-2021 change read -4.1% instead of -13.7%. */
+  D.resSeries = function (place, years) {
+    var out = { vecs: {}, used: null, members: null };
+    if (place.level === 'CSD' || place.level === 'PR' || place.level === 'CA') {
+      years.forEach(function (y) {
+        var v = D.resVec(place.code, y);
+        if (v) out.vecs[y] = v;
+      });
+      return out;
+    }
+    var mem = D.membersOf(place.level, place);
+    var keep = mem.filter(function (c) {
+      return years.every(function (y) { return D.hasRes(c, y); });
+    });
+    out.members = mem.length; out.used = keep.length;
+    if (!keep.length) return out;
+    years.forEach(function (y) {
+      out.vecs[y] = D.aggregate(keep, function (c) { return D.resVec(c, y); }).vec;
+    });
+    return out;
   };
 
   /* ---------------------------------------------- neighbourhood helpers */

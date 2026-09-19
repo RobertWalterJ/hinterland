@@ -1357,3 +1357,45 @@ body.quiz-mode main { padding-bottom: 24px; }
 .qpaused { padding-top: 12px; }
 .quiz-wrap .qnextbar .btn { width: 100%; min-height: 54px; font-size: 17px; justify-content: center; }
 .qverdict span:last-child { line-height: 1.35; }
+
+/* ---------------------------------------------- answer-first screens */
+.eyebrow-s { font-size: 14px; color: var(--ink-2); margin: 0 0 6px; }
+.screen-q { font-family: var(--display); font-size: 26px; line-height: 1.2; margin: 0 0 12px; }
+.answer-p { font-size: 18px; line-height: 1.55; margin: 0 0 12px; max-width: 36em; }
+.answer-p:last-child { margin-bottom: 0; }
+.chart-says { font-size: 16px; line-height: 1.5; color: var(--ink-1); margin: 10px 0 0; }
+
+/* change over time */
+.chg-host { width: 100%; }
+.chg-chart { display: block; overflow: visible; }
+.chg-grid { stroke: var(--line); stroke-width: 1; }
+.chg-base { stroke: var(--line-strong); stroke-width: 1.5; }
+.chg-seam { stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chg-ax { font-size: 13px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+.chg-line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.chg-line.is-me { stroke: var(--gain); }
+.chg-line.is-on { stroke: var(--ink-3); stroke-width: 2.2; }
+.chg-dot.is-me { fill: var(--gain); stroke: var(--surface-1); stroke-width: 2; }
+.chg-dot.is-on { fill: var(--ink-3); stroke: var(--surface-1); stroke-width: 2; }
+.chg-dot.is-hollow { fill: var(--surface-1); stroke-width: 2.5; }
+.chg-dot.is-me.is-hollow { stroke: var(--gain); }
+.chg-dot.is-on.is-hollow { stroke: var(--ink-3); }
+.chg-lab { font-size: 14px; font-weight: 650; }
+.chg-lab.is-me { fill: var(--ink-1); }
+.chg-lab.is-on { fill: var(--ink-2); }
+.chg-rows { display: grid; gap: 4px; }
+.chg-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas:
+  "name spark ends" "word word word"; align-items: center; gap: 2px 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--line); }
+.chg-row:last-child { border-bottom: 0; }
+.chg-name { grid-area: name; font-size: 16.5px; font-weight: 600; }
+.chg-row > svg { grid-area: spark; }
+.chg-ends { grid-area: ends; font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chg-arrow { color: var(--ink-3); margin: 0 4px; }
+.chg-word { grid-area: word; font-size: 14.5px; color: var(--ink-2); }
+.chg-spark { overflow: visible; }
+.chg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chg-list { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; font-size: 16.5px; line-height: 1.45; }
+.chg-sub { color: var(--ink-2); font-size: 14.5px; }
+.chg-events { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; font-size: 16.5px; line-height: 1.45; }
+@media (max-width: 720px) { .chg-cols { grid-template-columns: 1fr; } }
