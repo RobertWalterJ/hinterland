@@ -1026,6 +1026,78 @@ def test_stated_constants():
           "sound.js branches on the flag; panels.js passes it")
 
 
+def test_quiz():
+    """The quiz: a bank built under its gates, and a scheduler that behaves.
+
+    Both were found faulty when first run, which is why these checks exist.
+    The bank offered the same answer twice and started card sentences in
+    lower case; the scheduler, in simulation, let its review backlog climb
+    without limit, starved three of five strands, and called questions
+    "learned" that were remembered a third of the time. None of that was
+    visible by reading the code.
+
+    The scheduler checks are BEHAVIOURAL. A simulated learner cannot say how
+    fast Robert learns, and nothing here claims it: what can be checked is
+    that breadth never jams, the backlog drains, intervals stay capped, and
+    "learned" means something.
+    """
+    head("10. The quiz: its question bank and its scheduler")
+    try:
+        subprocess.run(["node", "--version"], capture_output=True, check=True)
+    except Exception:
+        check("node is available", False)
+        return
+
+    r = subprocess.run(["node", os.path.join(HERE, "quiz_selftest.js")],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        check("the question bank builds from the real data", False, r.stderr[:300])
+        return
+    b = json.loads(r.stdout.strip().splitlines()[-1])
+    strands = sorted(set(k.split("/")[0] for k in b["byForm"]))
+    check("the question bank builds from the real data, under every gate",
+          b["items"] >= 2000 and b["problemCount"] == 0,
+          "%d questions in %d ms; %d problems%s" % (
+              b["items"], b["buildMs"], b["problemCount"],
+              (": " + "; ".join(b["problems"][:3])) if b["problems"] else ""))
+    check("...covering every strand", strands == ["A", "B", "C", "D", "E"],
+          "strands " + "".join(strands))
+    worst_stem = max(v["stemMax"] for k, v in b["lengths"].items() if k in "ABCD")
+    worst_card = max(v["cardMax"] for v in b["lengths"].values())
+    check("...with short stems and card sentences for reading aloud",
+          worst_stem <= 12 and worst_card <= 22,
+          "longest place stem %d words, longest card %d" % (worst_stem, worst_card))
+
+    r = subprocess.run(["node", os.path.join(HERE, "quiz_simulate.js")],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        check("the scheduler simulation runs", False, r.stderr[:300])
+        return
+    s = json.loads(r.stdout.strip().splitlines()[-1])
+    runs = s["runs"]
+    check("the scheduler is deterministic for a given learner", s["deterministic"])
+    check("new questions never jam behind reviews",
+          all(x["starvedSessions"] <= 3 for x in runs),
+          "longest run without a new question: %s sessions"
+          % ", ".join(str(x["starvedSessions"]) for x in runs))
+    check("the review backlog drains rather than growing without limit",
+          all(x["finalDueTomorrow"] < x["maxDueTomorrow"] or
+              x["finalDueTomorrow"] <= 20 for x in runs),
+          "; ".join("peak %d, end %d" % (x["maxDueTomorrow"], x["finalDueTomorrow"])
+                    for x in runs))
+    check("intervals stay capped at sixty days",
+          all(x["maxInterval"] <= 60 for x in runs))
+    check("the learned count only ever rises",
+          all(x["learnedNeverFalls"] for x in runs))
+    check("every strand makes progress",
+          all(x["strandsLearned"] == "ABCDE" for x in runs),
+          ", ".join(x["strandsLearned"] for x in runs))
+    check("\"learned\" means remembered at the next review, most of the time",
+          all((x["learnedHeldAtNextReview"] or 0) >= 0.6 for x in runs),
+          ", ".join("%.0f%%" % (100 * (x["learnedHeldAtNextReview"] or 0))
+                    for x in runs))
+
+
 def test_findings_engine():
     """The brief must not be a template wearing a different number.
 
@@ -1378,6 +1450,7 @@ def main():
     test_demography(con)
     test_stated_constants()
     test_findings_engine()
+    test_quiz()
 
     print("\n" + "=" * 62)
     if FAILS:
