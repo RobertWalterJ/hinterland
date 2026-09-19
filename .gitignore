@@ -1,0 +1,30 @@
+# --- generated; rebuilt by the pipeline --------------------------------------
+# The analysis database is ~110 MB, over GitHub's 100 MB limit, and is rebuilt
+# from source by `python pipeline/build.py`.
+data/analyst.db
+data/analyst.db-journal
+
+# Statistics Canada downloads (~1.4 GB). Every one is re-fetched from its
+# published URL by `python pipeline/fetch.py`; sources.py lists them all.
+data/raw/
+
+# Build logs.
+data/_*.log
+
+# The single-file Artifact build.
+build/
+
+# NOTE: data/legacy_residence_series.csv is deliberately NOT ignored. It holds
+# the 2001, 2006 and 2011 census legs, whose original bulk files are no longer
+# on disk and are not on the Web Data Service. It is the durable record, and a
+# rebuild cannot recreate it.
+
+# NOTE: docs/ is deliberately NOT ignored. It is the GitHub Pages site,
+# generated from app/ by `python pipeline/make_deploy.py`. Edit app/, never docs/.
+
+# --- tooling -----------------------------------------------------------------
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.claude/

@@ -1,0 +1,6 @@
+# Store text with LF in the repository; the double-click launchers must keep
+# Windows line endings or cmd.exe misreads them.
+* text=auto
+*.bat text eol=crlf
+*.png binary
+*.ico binary

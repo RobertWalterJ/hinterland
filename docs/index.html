@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hinterland</title>
+<meta name="description" content="Shift-share, competitive and comparative analysis for Ontario municipalities and neighbourhoods, on Statistics Canada data.">
+<meta name="theme-color" content="#1c1a17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hinterland">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231c1a17'/%3E%3Crect x='7' y='17' width='4' height='9' rx='1.5' fill='%23faf9f6'/%3E%3Crect x='14' y='11' width='4' height='15' rx='1.5' fill='%23faf9f6'/%3E%3Crect x='21' y='6' width='4' height='20' rx='1.5' fill='%23faf9f6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div id="app">
+
+  <header class="topbar">
+    <div class="wordmark" title="Hinterland">
+      <span class="w1">Hinter</span><span class="w2">land</span><span class="dot"></span>
+    </div>
+    <div class="wordmark-sub">Ontario</div>
+
+    <div class="chipset">
+      <button class="chip is-place" id="placeChip" aria-haspopup="dialog">
+        <span class="k">Place</span><span class="v">—</span><span class="caret">▾</span>
+      </button>
+      <button class="chip" id="benchChip" aria-haspopup="dialog">
+        <span class="k">compared with</span><span class="v">—</span><span class="caret">▾</span>
+      </button>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <button class="btn btn-primary" id="exportBtn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>
+      </svg>
+      Export
+    </button>
+    <button class="iconbtn" id="readBtn" title="Read this page aloud" aria-label="Read this page aloud">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 5h9M4 9.5h9M4 14h6" class="lines"/>
+        <path d="M15.5 12.5l5-3v9l-5-3z" class="play"/>
+        <path d="M16 9.5v9M20 9.5v9" class="pause" style="display:none"/>
+      </svg>
+    </button>
+    <button class="iconbtn" id="readStopBtn" title="Stop reading" aria-label="Stop reading" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">
+        <rect x="6.5" y="6.5" width="11" height="11" rx="2"/>
+      </svg>
+    </button>
+    <button class="iconbtn" id="soundBtn" title="Sound off" aria-label="Turn sound on" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M11 5 6 9H2v6h4l5 4V5z"/>
+        <path d="M16 9.5a4 4 0 0 1 0 5" class="wave1"/>
+        <path d="M18.8 6.7a8 8 0 0 1 0 10.6" class="wave2"/>
+        <path d="M3 3l18 18" class="mute"/>
+      </svg>
+    </button>
+    <button class="iconbtn" id="themeBtn" title="Light or dark" aria-label="Switch light or dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </header>
+
+  <div style="display:grid;grid-template-rows:auto 1fr;min-height:0">
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+    <main>
+      <div class="wrap">
+        <div id="view" class="grid"></div>
+      </div>
+    </main>
+  </div>
+
+</div>
+
+<nav class="bottomnav" id="nav" role="tablist">
+  <button data-tab="place" aria-label="Choose a place">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/>
+    </svg>
+    Place
+  </button>
+  <button data-tab="overview" aria-selected="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <path d="M4 20V13M10 20V7M16 20v-5M22 20H2"/>
+    </svg>
+    Now
+  </button>
+  <button data-tab="change">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5h-5"/>
+    </svg>
+    Change
+  </button>
+  <button data-tab="population">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <circle cx="9" cy="7" r="3.2"/>
+      <path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/>
+      <path d="M17 4.5a3.2 3.2 0 0 1 0 6M18.5 13.8c1.9.9 3 2.8 3 5.2"/>
+    </svg>
+    Population
+  </button>
+  <button data-tab="map">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <path d="M9 3L3 5.5v15L9 18l6 3 6-2.5v-15L15 6 9 3z"/><path d="M9 3v15M15 6v15"/>
+    </svg>
+    Map
+  </button>
+  <button data-tab="brief">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+      <path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>
+    </svg>
+    Brief
+  </button>
+</nav>
+
+<div class="boot" id="boot">
+  <div class="inner">
+    <svg width="42" height="42" viewBox="0 0 32 32" aria-hidden="true">
+      <rect width="32" height="32" rx="7" fill="var(--brand)"/>
+      <rect x="7" y="17" width="4" height="9" rx="1.5" fill="var(--on-brand)"/>
+      <rect x="14" y="11" width="4" height="15" rx="1.5" fill="var(--on-brand)"/>
+      <rect x="21" y="6" width="4" height="20" rx="1.5" fill="var(--on-brand)"/>
+    </svg>
+    <div style="font-family:var(--display);font-size:17px;font-weight:620">Hinterland</div>
+    <div class="bar"><i></i></div>
+    <div class="msg" id="bootMsg">Waking up</div>
+  </div>
+</div>
+
+<script src="js/methods.js"></script>
+<script src="js/data.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/map.js"></script>
+<script src="js/export.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/read.js"></script>
+<script src="js/findings.js"></script>
+<script src="js/spatial.js"></script>
+<script src="js/ttwa.js"></script>
+<script src="js/brief.js"></script>
+<script src="js/exportui.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/panel-population.js"></script>
+<script src="js/panel-region.js"></script>
+<script src="js/panel-impact.js"></script>
+<script src="js/app.js"></script>
+<script>
+/* The service worker is registered by app.js only after the data has loaded.
+   Registering it here would have it pre-cache nineteen files while the app is
+   fetching its own eight, and taking control mid-flight aborts those - which
+   surfaces as an unexplained "failed to fetch" on first run. */
+</script>
+</body>
+</html>
