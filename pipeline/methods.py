@@ -63,6 +63,11 @@ import math
 # implies a per-cell sd of 2.02 against the theoretical 2.00.
 ROUNDING_SD = 2.0
 
+# Long-form sampling error: sd of a published count ~ SAMPLE_K * sqrt(count),
+# the median fitted to the published 95% intervals in 98-10-0456. See
+# methods.js; validate.py re-derives it and fails if this drifts.
+SAMPLE_K = 1.92
+
 # Cells at or below this many workers are withheld: the rounding error is a
 # large fraction of the value and the cell carries no usable signal.
 MIN_RELIABLE_CELL = 25

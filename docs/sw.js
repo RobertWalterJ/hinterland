@@ -51,10 +51,12 @@ var SHELL = [
   'index.html',
   'css/app.css',
   'js/methods.js', 'js/data.js', 'js/charts.js', 'js/map.js',
-  'js/export.js', 'js/sound.js', 'js/read.js', 'js/findings.js',
+  'js/export.js', 'js/sound.js', 'js/read.js', 'js/terms.js',
+  'js/findings.js',
   'js/spatial.js',
   'js/ttwa.js', 'js/brief.js', 'js/exportui.js', 'js/panels.js',
   'js/panel-population.js', 'js/panel-region.js', 'js/panel-impact.js',
+  'js/learn.js',
   'js/app.js',
   'manifest.webmanifest'
 ];

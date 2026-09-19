@@ -201,7 +201,18 @@
       (p.pop2021 ? stat(C.fmt(p.pop2021), 'residents', '2021 Census count') : '') +
       '</div>' +
       '<div class="gloss">' + glossFor(ctx) + '</div>';
+    var LR = root.GRA.learn;
+    if (LR) {
+      top.appendChild(LR.chips(
+        ['jobs-ratio', 'self-containment', 'place-of-work'],
+        { label: 'What these mean:' }));
+    }
     host.appendChild(top);
+
+    /* The question the tool is asked most, answered in words, straight after
+       the headline: what the jobs here are, and what the people who live here
+       do. Two different questions, kept side by side. */
+    if (LR && p.level === 'CSD') host.appendChild(LR.whatPeopleDo(ctx, phone));
 
     if (cm) {
       var cCom = card('Commuting, and what it can and cannot tell you',
@@ -269,6 +280,7 @@
         }), { valueName: 'Location quotient', rowH: 22 });
       });
     }
+    if (LR) cSpec.appendChild(LR.chips(['location-quotient', 'reference-economy']));
     cSpec.appendChild(h('<div class="card-foot">' + refLine(ctx) + '</div>'));
     grid.appendChild(cSpec);
 
@@ -291,6 +303,8 @@
         stat(C.signed(t.competitive), 'competitive effect', null,
              t.competitive >= 0 ? 'pos' : 'neg') +
         '</div>'));
+      if (LR) cc.appendChild(LR.chips(
+        ['shift-share', 'industry-mix-effect', 'competitive-effect']));
       cc.appendChild(h('<div class="card-foot">' + competitiveGloss(ctx) + '</div>'));
       right.appendChild(cc);
     }
@@ -299,6 +313,8 @@
     if (ctx.indices) {
       var ci = card('Shape of the economy', null);
       ci.appendChild(indexBlock(ctx, phone));
+      if (LR) ci.appendChild(LR.chips(
+        ['specialisation', 'diversity', 'hachman', 'economic-base']));
       right.appendChild(ci);
     }
 

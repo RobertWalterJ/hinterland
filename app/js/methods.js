@@ -28,6 +28,32 @@
      not the sd of an error uniform on {-2..2} (sqrt(2)). Confirmed empirically
      in pipeline/validate.py against the 64,470 published place-of-work cells. */
   M.ROUNDING_SD = 2.0;
+
+  /* Long-form SAMPLING error, which is what actually dominates. The standard
+     deviation of a published count runs at about SAMPLE_K x sqrt(count): the
+     median fitted to the 4,997 Ontario municipal sector cells that carry
+     published 95% intervals in 98-10-0456 (half-width / 1.96 / sqrt(count)).
+     pipeline/validate.py re-derives it from those intervals and fails if this
+     drifts. For a cell of 10,000 workers it is ~190, against 2 for rounding.
+     The place-of-work tables publish no intervals, so this is borrowed for
+     them - and every use of it says so. */
+  M.SAMPLE_K = 1.92;
+
+  /* Standard deviation of one published count: sampling and rounding. */
+  M.countSd = function (n) {
+    if (n == null || !isFinite(n)) return null;
+    return Math.sqrt(M.SAMPLE_K * M.SAMPLE_K * Math.max(0, n) +
+                     M.ROUNDING_SD * M.ROUNDING_SD);
+  };
+
+  /* Is `a` larger than `b` by more than z standard deviations of the
+     difference? The separation test every comparison the tool STATES must
+     pass - not just the headline one. */
+  M.clearlyLarger = function (a, b, z) {
+    if (a == null || b == null) return false;
+    var sd = Math.sqrt(Math.pow(M.countSd(a), 2) + Math.pow(M.countSd(b), 2));
+    return (a - b) >= (z == null ? 3 : z) * sd;
+  };
   M.MIN_RELIABLE_CELL = 25;
   M.WEAK_CELL = 50;
 

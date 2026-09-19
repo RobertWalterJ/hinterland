@@ -246,6 +246,45 @@ def main():
                              for sec in IOC.NAICS_SECTORS),
     })
 
+    # ------------------------------------ occupation, and sampling error
+    # Both from 98-10-0456, both RESIDENCE basis: what the people who live in a
+    # place do, and how uncertain each published count is. Occupation answers
+    # "what do people do here?" in the words people use - nurse, trades,
+    # teacher - where industry answers it in NAICS. Kept as [count, lo, hi]
+    # triples so the interface never shows a number without its interval.
+    nocs = sorted(set(r[0] for r in con.execute(
+        "SELECT DISTINCT noc FROM occupation")), key=int)
+    noc_idx = dict((n, i) for i, n in enumerate(nocs))
+    labels = dict(con.execute(
+        "SELECT noc, label FROM occupation GROUP BY noc"))
+    occ = {}
+    for code, noc, n, lo, hi in con.execute(
+            "SELECT geo_code, noc, workers, ci_lo, ci_hi FROM occupation "
+            "WHERE year=2021"):
+        slot = occ.setdefault(code, [None] * len(nocs))
+        slot[noc_idx[noc]] = [r1(n), r1(lo), r1(hi)]
+    ci = {}
+    for code, nc, lo, hi in con.execute(
+            "SELECT geo_code, naics, ci_lo, ci_hi FROM employment_ci "
+            "WHERE year=2021 AND basis='residence' AND measure='total'"):
+        if nc not in IDX:
+            continue
+        ci.setdefault(code, [None] * 20)[IDX[nc]] = [r1(lo), r1(hi)]
+    write("detail.json", {
+        "year": 2021, "basis": "place of residence",
+        "source": "98-10-0456",
+        "noc_order": nocs,
+        "noc_labels": [labels[n] for n in nocs],
+        "occupation": occ,
+        "naics_order": NAICS_CODES,
+        "sector_ci95": ci,
+        "note": ("Residence basis: the employed people who LIVE in each place. "
+                 "Every count carries its published 95% confidence interval; "
+                 "these are the only measure of long-form sampling error in "
+                 "the tool, which dominates rounding for any cell above a few "
+                 "dozen workers."),
+    })
+
     # -------------------------------------------------- correspondence + meta
     cc = {}
     for ct, csd, pop_, share, prim in con.execute(

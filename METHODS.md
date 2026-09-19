@@ -191,9 +191,38 @@ settle near 0.25, which is the default here.
 This is used only to temper provincial input-output multipliers before they are
 applied to a municipality. It reduces the well-known upward bias; it does not
 eliminate it, and no LQ-based adjustment substitutes for a survey-based regional
-table. **The input-output impact readout is not enabled in this release** — the
-multiplier data is in the database and the mapping from the 230 input-output
-industries to the 20 NAICS sectors is the remaining work. See *Not yet built*.
+table.
+
+### 3.4 Input-output impact
+
+The impact panel answers "what would N more jobs in this industry imply?" with
+Statistics Canada's Ontario input-output multipliers (36-10-0113), scaled down
+to the municipality by the Flegg-Webber factor above.
+
+**Why the 33-industry summary table and not the 246-industry detail table.**
+The rest of the tool works in the 20 NAICS sectors. Aggregating 246 detail
+industries into 20 sectors would need each industry's output as a weight, and
+the multiplier tables do not publish output — so those weights would have to be
+invented, and an invented weight is indistinguishable from a result. The 33
+summary industries map onto NAICS with a concordance that fits on a page and is
+checked in `pipeline/io_concordance.py`. Three industries span more than one
+NAICS sector (finance, insurance, real estate and holding companies; non-profit
+institutions) and are left whole rather than split on invented weights.
+Owner-occupied dwellings, an imputed industry with no employment, is excluded.
+
+**What the numbers are.** Type I multipliers count **direct plus indirect**
+effects — the jobs in this industry and in its supply chain. Type II adds
+**induced** effects — jobs supported when the workers in both spend their
+wages. Both are dimensionless ratios of total to direct, so an employment
+impact needs only a job count, not dollar output.
+
+**What they cannot tell you.** They are **provincial** multipliers. Applying
+them to a municipality overstates local capture, because a smaller economy buys
+more of its inputs from outside itself; the Flegg-Webber factor reduces that
+bias without removing it. They assume fixed technical coefficients, no capacity
+constraints and no price response, so they say what the current structure
+implies, not what will happen. The induced part rests on household spending
+patterns holding, and is the least reliable part.
 
 ---
 
@@ -402,6 +431,35 @@ sampling error, which the tool does not attempt to quantify.
 
 ---
 
+### 7.2 Sampling error
+
+Rounding is the floor below which a number cannot be read; **sampling error is
+what actually dominates.** Industry and occupation come from the 2021 long-form
+questionnaire, sent to one household in four, so every count is an estimate.
+
+Table 98-10-0456 publishes a **95% confidence interval** for every count it
+carries. Across the 4,997 Ontario municipal sector cells of at least 50
+workers, the interval's half-width, divided by 1.96 and by the square root of
+the count, has a median of **1.92**. So the standard deviation of a published
+count runs at about
+
+```
+sd ≈ 1.92 × √count
+```
+
+— about 19 for a cell of 100 workers, about 190 for a cell of 10,000, against a
+flat 2 for rounding. The two are combined in quadrature. The constant lives in
+`methods.py` and `methods.js` (`SAMPLE_K`), and `validate.py` re-derives it from
+the published intervals and fails if the two drift apart.
+
+Where Statistics Canada publishes an interval, the tool uses it directly.
+Where it does not — the place-of-work tables — the model above is borrowed, and
+the interface says so.
+
+**Every comparison the tool states is tested against this.** "A is larger than
+B" is only stated where the gap exceeds three standard deviations of the
+difference.
+
 ## 8. Geography
 
 The geography spine is aggregated from the 137,867 Ontario dissemination blocks
@@ -499,31 +557,6 @@ Notes on the formats:
 - **Shapefile** ships `.shp`, `.shx`, `.dbf`, `.prj` and `.cpg`. The `.prj`
   names WGS 84 so QGIS and ArcGIS open it without prompting. The join key is
   CSDUID or CTUID, which match the Statistics Canada 2021 boundary files.
-
----
-
-## 11. Not yet built
-
-Stated here rather than left to be discovered.
-
-- **Input-output impact readout.** The Ontario multipliers from 36-10-0595 are
-  loaded (435,430 rows) and the Flegg-Webber adjustment is implemented and
-  tested, but the mapping from the 230 input-output industries to the 20 NAICS
-  sectors is not written, so no impact panel is exposed. It was left out rather
-  than shipped shaky.
-- **Census tract change over time.** Would need the Statistics Canada
-  2016-to-2021 tract correspondence file, and honest handling of split and
-  merged tracts. The current answer — structure only, and say why — is the
-  defensible one.
-- **Place-of-work industry before 2021.** Statistics Canada published the
-  place-of-work-geography industry tables for the first time in the 2021 cycle,
-  so a workplace-basis time series would have to be reconstructed from the
-  earlier place-of-work products and is not attempted.
-- **Arcelus (1984) decomposition.** The regional-growth and regional-industry-mix
-  extension is not implemented; the Esteban-Marquillas split covers the question
-  it was built to answer.
-- **Sampling error.** Only the rounding error is quantified. The census
-  long-form sampling error is larger and is not modelled.
 
 ---
 
@@ -637,6 +670,7 @@ picture while still counting in the totals. `pipeline/validate.py` asserts that
 every municipality and tract is locatable and that both ends of every mappable
 flow resolve.
 
+### 12.1 Travel-to-work areas
 
 A municipality is an administrative object; a labour market is a functional
 one. This rebuilds Ontario's labour markets from the municipality-to-
@@ -694,6 +728,33 @@ with the break visible.
 The components do not sum exactly to the change in population: Statistics
 Canada carries a residual term, which is loaded but excluded from the
 summaries.
+
+---
+
+## 14. Not yet built
+
+Stated here rather than left to be discovered.
+
+- **Census tract change over time.** Would need the Statistics Canada
+  2016-to-2021 tract correspondence file, and honest handling of split and
+  merged tracts. The current answer — structure only, and say why — is the
+  defensible one.
+- **Place-of-work industry before 2021.** Statistics Canada published the
+  place-of-work-geography industry tables for the first time in the 2021 cycle,
+  so a workplace-basis time series would have to be reconstructed from the
+  earlier place-of-work products and is not attempted.
+- **Arcelus (1984) decomposition.** The regional-growth and regional-industry-mix
+  extension is not implemented; the Esteban-Marquillas split covers the question
+  it was built to answer.
+- **Sampling error on the place-of-work tables.** Sampling error is now modelled
+  (section 7.2), from the 95% confidence intervals that 98-10-0456 publishes for
+  every residence-basis count. The place-of-work tables publish none, so for
+  them the variance model is *borrowed* from the residence table — a reasonable
+  stand-in, since both come from the same 25% long-form sample, but not a
+  measurement.
+- **Employed-labour-force industry counts before 2016 below the census
+  division** (section 7.0). Not published; the pre-2016 legs stay on the wider
+  labour-force universe.
 
 ---
 

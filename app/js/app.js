@@ -51,6 +51,7 @@
     { id: 'hoods', label: 'Neighbourhoods' },
     { id: 'map', label: 'Map' },
     { id: 'brief', label: 'Brief' },
+    { id: 'learn', label: 'Learn' },
     { id: 'sources', label: 'Sources' }
   ];
   A.TABS = TABS;

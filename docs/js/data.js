@@ -47,11 +47,15 @@
       getJSON('geo.json'), getJSON('work_csd.json'), getJSON('res_series.json'),
       getJSON('population.json'), getJSON('commute.json'),
       getJSON('business.json'), getJSON('meta.json'), getJSON('ct_csd.json'),
-      getJSON('components.json'), getJSON('io.json')
+      getJSON('components.json'), getJSON('io.json'),
+      getJSON('detail.json')
     ]).then(function (r) {
       D.geo = r[0]; D.work = r[1]; D.res = r[2]; D.pop = r[3];
       D.commute = r[4]; D.biz = r[5]; D.meta = r[6]; D.ctCsd = r[7];
       D.components = r[8]; D.io = r[9];
+      /* Occupation, and the published 95% intervals, for the people who LIVE
+         in each place (98-10-0456). */
+      D.detail = r[10];
       step('Sorting 577 municipalities');
       index();
       D.ready = true;
@@ -420,6 +424,58 @@
     });
     return Object.keys(out.series).length ? out : null;
   };
+
+  /* ------------------------------------------------------- occupation */
+
+  /* Plain-English names for the ten broad occupation groups of the National
+     Occupational Classification. Four words or fewer, because they are read
+     as answer options; the official title stays alongside for the
+     explanation. Labels, not facts - the grouping is Statistics Canada's. */
+  D.NOC_SHORT = {
+    '0': 'Senior managers',
+    '1': 'Office and finance',
+    '2': 'Science and technology',
+    '3': 'Health care',
+    '4': 'Education, law and social',
+    '5': 'Arts, culture and sport',
+    '6': 'Sales and service',
+    '7': 'Trades and transport',
+    '8': 'Farming and resources',
+    '9': 'Factory and utilities'
+  };
+
+  /* What the people who LIVE in a place do for a living, largest first.
+     Residence basis - it describes residents wherever they work, which is a
+     different question from what the jobs located in the place are. */
+  D.occupationFor = function (code) {
+    var d = D.detail && D.detail.occupation[code];
+    if (!d) return null;
+    var tot = 0;
+    d.forEach(function (t) { if (t && t[0]) tot += t[0]; });
+    if (!tot) return null;
+    return D.detail.noc_order.map(function (noc, i) {
+      var t = d[i] || [null, null, null];
+      return {
+        noc: noc, short: D.NOC_SHORT[noc] || noc,
+        title: D.detail.noc_labels[i].replace(/^\d+\s+/, ''),
+        n: t[0], lo: t[1], hi: t[2],
+        share: t[0] != null ? t[0] / tot : null
+      };
+    }).sort(function (a, b) { return (b.n || 0) - (a.n || 0); });
+  };
+
+  /* The published 95% interval on a 2021 residence-basis sector count. */
+  D.sectorCI = function (code, i) {
+    var d = D.detail && D.detail.sector_ci95[code];
+    return d && d[i] ? d[i] : null;
+  };
+
+  /* Sampling error for a count that has no published interval - the
+     place-of-work tables publish none. The standard deviation of a count runs
+     at about 1.92 x sqrt(count): the median fitted to the 4,997 Ontario
+     municipal sector cells that DO carry published intervals (98-10-0456).
+     Borrowed, and every use of it says so. Combined with rounding (sd 2). */
+  D.countSd = function (n) { return root.GRA.methods.countSd(n); };
 
   /* Natural increase and the three migration streams, per year. */
   D.componentSummary = function (byYear, vintage) {

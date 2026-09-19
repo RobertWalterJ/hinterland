@@ -37,7 +37,7 @@ ASSETS = [
     "data/geo.json", "data/work_csd.json", "data/work_ct.json",
     "data/res_series.json", "data/population.json", "data/commute.json",
     "data/business.json", "data/meta.json", "data/ct_csd.json",
-    "data/components.json", "data/io.json",
+    "data/components.json", "data/io.json", "data/detail.json",
     "data/boundaries_csd.json", "data/boundaries_ct.json",
 ]
 

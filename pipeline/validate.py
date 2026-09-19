@@ -797,6 +797,87 @@ def test_stated_constants():
           "classification break" in met55,
           "Ontario NAICS 55 2021/2016 = %.2f" % (r55 or 0))
 
+    # --- the plain-English layer is pinned to METHODS.md ------------------
+    # Every term in app/js/terms.js names the METHODS.md section it restates.
+    # The rule is that the learning layer may not claim anything about a
+    # method that METHODS.md does not, and this is the enforceable part of it:
+    # a term citing a section that does not exist has come loose from the one
+    # place its claims are defended.
+    terms_js = io.open(os.path.join(app, "js", "terms.js"),
+                       encoding="utf-8").read()
+    cited = re.findall(r"methods:\s*'([^']+)'", terms_js)
+    heads = set(h.strip() for h in re.findall(
+        r"^#{2,3}\s+(.+?)\s*$",
+        io.open(os.path.join(ROOT, "METHODS.md"), encoding="utf-8").read(),
+        re.M))
+    loose = sorted(set(c for c in cited if c not in heads))
+    check("every plain-English term cites a METHODS.md section that exists",
+          cited and not loose,
+          "%d terms; %s" % (len(cited), ", ".join(loose) if loose
+                            else "all resolve"))
+    ids = re.findall(r"\{\s*id:\s*'([^']+)'", terms_js)
+    check("...and every term has all five layers",
+          all(len(re.findall(r"\b%s:\s*'" % k, terms_js)) >= len(ids)
+              for k in ("plain", "how", "when", "cant")) and
+          len(re.findall(r"\bname:\s*'", terms_js)) >= len(ids),
+          "%d terms" % len(ids))
+    mapped = set(re.findall(r"'([a-z0-9-]+)'",
+                            " ".join(re.findall(r"ids:\s*\[([^\]]+)\]",
+                                                terms_js))))
+    check("...and every method on the method map is a defined term",
+          mapped and mapped <= set(ids),
+          ", ".join(sorted(mapped - set(ids))) or "all %d defined" % len(mapped))
+
+    # --- occupation and published sampling error (98-10-0456) -------------
+    # The sampling constant is RE-DERIVED here from the published intervals,
+    # never trusted: SAMPLE_K lives in methods.py and methods.js, and a
+    # constant that is only ever restated is how the 1.41 rounding error
+    # survived. Median of (half-width / 1.96 / sqrt(count)) over Ontario
+    # municipal sector cells of at least 50 workers.
+    con4 = sqlite3.connect(DB)
+    ks = sorted(((hi - lo) / 2.0 / 1.96) / math.sqrt(n) for n, lo, hi in con4.execute(
+        "SELECT e.jobs, ci.ci_lo, ci.ci_hi FROM employment_ci ci "
+        "JOIN employment e ON e.geo_code=ci.geo_code AND e.year=ci.year "
+        "AND e.naics=ci.naics AND e.basis=ci.basis AND e.measure=ci.measure "
+        "WHERE ci.geo_code LIKE '35_____' AND e.jobs >= 50"))
+    kmed = ks[len(ks) // 2] if ks else None
+    check("the sampling-error constant matches the published intervals",
+          kmed is not None and abs(kmed - MT.SAMPLE_K) / MT.SAMPLE_K < 0.05,
+          "re-derived %.3f from %d cells; methods.py holds %.2f"
+          % (kmed or 0, len(ks), MT.SAMPLE_K))
+    js = io.open(os.path.join(app, "js", "methods.js"), encoding="utf-8").read()
+    m_js = re.search(r"M\.SAMPLE_K\s*=\s*([0-9.]+)", js)
+    check("...and methods.js holds the same constant as methods.py",
+          m_js is not None and abs(float(m_js.group(1)) - MT.SAMPLE_K) < 1e-9,
+          "js %s / py %s" % (m_js.group(1) if m_js else "?", MT.SAMPLE_K))
+
+    # every published count sits inside its own published interval
+    bad_ci = con4.execute(
+        "SELECT COUNT(*) FROM employment_ci ci JOIN employment e "
+        "ON e.geo_code=ci.geo_code AND e.year=ci.year AND e.naics=ci.naics "
+        "AND e.basis=ci.basis AND e.measure=ci.measure "
+        "WHERE NOT (ci.ci_lo <= e.jobs AND e.jobs <= ci.ci_hi)").fetchone()[0]
+    n_ci = con4.execute("SELECT COUNT(*) FROM employment_ci").fetchone()[0]
+    check("every sector interval brackets its published count",
+          n_ci > 10000 and bad_ci == 0,
+          "%d of %d fail" % (bad_ci, n_ci))
+
+    # occupations sum to the published employed total (rounding only)
+    occ_tot = con4.execute(
+        "SELECT SUM(workers) FROM occupation WHERE geo_code='35'").fetchone()[0]
+    pub_tot = con4.execute(
+        "SELECT jobs FROM employment WHERE geo_code='35' AND year=2021 AND "
+        "basis='residence' AND measure='total' AND naics='TOTAL'").fetchone()
+    check("Ontario's ten occupation groups sum to its employed total",
+          occ_tot and pub_tot and
+          abs(occ_tot - pub_tot[0]) <= 3 * MT.rounding_sd(10),
+          "%s vs %s" % (int(occ_tot or 0), int(pub_tot[0]) if pub_tot else "?"))
+    n_occ_places = con4.execute(
+        "SELECT COUNT(DISTINCT geo_code) FROM occupation").fetchone()[0]
+    check("...and every municipality has an occupation profile",
+          n_occ_places >= 577, "%d places" % n_occ_places)
+    con4.close()
+
     # ...and the break that remains is disclosed where it is carried.
     pan = io.open(os.path.join(app, "js", "panels.js"), encoding="utf-8").read()
     exu = io.open(os.path.join(app, "js", "exportui.js"),

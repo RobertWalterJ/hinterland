@@ -174,6 +174,8 @@ CREATE TABLE employment (
     PRIMARY KEY (geo_code, year, naics, basis, measure));
 CREATE INDEX emp_lookup ON employment(basis, measure, year, naics);
 
+DROP TABLE IF EXISTS occupation;
+DROP TABLE IF EXISTS employment_ci;
 DROP TABLE IF EXISTS ct_population;
 CREATE TABLE ct_population (
     geo_code TEXT PRIMARY KEY,
@@ -620,6 +622,123 @@ def load_res_2021(con, ont_csds):
     con.commit()
     record_source(con, "res_industry_2021", len(out))
     log("employment (residence, 2021): %d rows" % seen)
+
+
+def load_res_2021_detail(con, ont_csds):
+    """Occupation, and the published confidence intervals, from 98-10-0456.
+
+    The residence loader above keeps one cell in each combination: the total
+    across occupation and gender, and the 'Count' row of the Statistics
+    dimension. That discards two things this table publishes and nothing else
+    in the tool can supply.
+
+    OCCUPATION. "What do people do here?" in plain English is a question about
+    occupation - nurse, trades, teacher - not about industry. A nurse and a
+    hospital accountant are both "health care" by industry. This table carries
+    ten broad occupation categories for every municipality, on the same
+    employed-labour-force universe as the rest of the residence series.
+
+    CONFIDENCE INTERVALS. The Statistics dimension carries the 95% lower and
+    upper bounds of every count. They are the only published measure of
+    long-form sampling error in the tool, and sampling error - not rounding -
+    is what dominates for any cell above a few dozen workers: measured across
+    the 4,997 Ontario municipal sector cells, the standard deviation runs at
+    about 1.9 x sqrt(count), against a flat 2 for rounding. METHODS.md said
+    sampling error "is not modelled". With these loaded, it can be.
+
+    Both are residence-basis: they describe the people who LIVE in a place,
+    and every figure built on them says so.
+    """
+    for ddl in (
+        """CREATE TABLE IF NOT EXISTS occupation (
+            geo_code TEXT NOT NULL, year INTEGER NOT NULL, noc TEXT NOT NULL,
+            label TEXT, workers REAL, ci_lo REAL, ci_hi REAL,
+            PRIMARY KEY (geo_code, year, noc))""",
+        """CREATE TABLE IF NOT EXISTS employment_ci (
+            geo_code TEXT NOT NULL, year INTEGER NOT NULL, naics TEXT NOT NULL,
+            basis TEXT NOT NULL, measure TEXT NOT NULL,
+            ci_lo REAL, ci_hi REAL,
+            PRIMARY KEY (geo_code, year, naics, basis, measure))"""):
+        con.execute(ddl)
+
+    log("occupation and confidence intervals: parsing 98-10-0456")
+    rd = open_zip_csv(path_for("res_industry_2021"))
+    hdr = next(rd)
+    col = dict((h, i) for i, h in enumerate(hdr))
+
+    def find(frag):
+        for h, i in col.items():
+            if frag in h:
+                return i
+        raise IOError("98-10-0456 has no column like %r: %s" % (frag, hdr))
+
+    i_occ = find("Occupation")
+    i_gen = find("Gender")
+    i_stat = find("Statistics")
+    i_ind = find("Industry")
+    # The total across place-of-work status: every employed resident.
+    i_tot = [i for h, i in col.items()
+             if h.startswith("Place of work status") and "Total" in h][0]
+
+    def geo_of(dg):
+        if dg.startswith("2021A0005"):
+            return dg[9:]
+        if dg.startswith("2021A0002"):
+            return dg[9:]
+        if dg.startswith("2021A00001"):
+            return "CA"
+        return None
+
+    def num(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    occ, ci = {}, {}
+    for row in rd:
+        if len(row) <= i_tot:
+            continue
+        code = geo_of(row[2])
+        if code is None or not (code == "CA" or code == ONT or code in ont_csds):
+            continue
+        if not row[i_gen].strip().startswith("Total"):
+            continue
+        stat = row[i_stat].strip()
+        kind = ("n" if stat == "Count" else
+                "lo" if "lower" in stat else
+                "hi" if "upper" in stat else None)
+        if kind is None:
+            continue
+        v = num(row[i_tot])
+        occ_label = row[i_occ].strip()
+        ind_label = row[i_ind].strip()
+
+        # (a) occupation profile: one occupation, all industries
+        if not occ_label.startswith("Total") and ind_label.startswith("Total"):
+            noc = occ_label.split(" ", 1)[0]
+            if noc.isdigit():
+                rec = occ.setdefault((code, noc), {"label": occ_label})
+                rec[kind] = v
+
+        # (b) sampling uncertainty on every industry cell
+        if occ_label.startswith("Total") and not ind_label.startswith("Total"):
+            nc = naics_from_label(ind_label)
+            if nc and kind in ("lo", "hi"):
+                ci.setdefault((code, nc), {})[kind] = v
+
+    occ_rows = [(c, 2021, noc, r["label"], r.get("n"), r.get("lo"), r.get("hi"))
+                for (c, noc), r in occ.items()]
+    ci_rows = [(c, 2021, nc, "residence", "total", r.get("lo"), r.get("hi"))
+               for (c, nc), r in ci.items() if "lo" in r and "hi" in r]
+    con.executemany("INSERT OR REPLACE INTO occupation VALUES (?,?,?,?,?,?,?)",
+                    occ_rows)
+    con.executemany(
+        "INSERT OR REPLACE INTO employment_ci VALUES (?,?,?,?,?,?,?)", ci_rows)
+    con.commit()
+    log("occupation and confidence intervals: %d occupation cells across %d "
+        "places, %d sector confidence intervals"
+        % (len(occ_rows), len(set(r[0] for r in occ_rows)), len(ci_rows)))
 
 
 def load_res_2016(con, ont_csds):
@@ -1215,7 +1334,7 @@ def load_io_summary(con):
 
 
 STAGES = ["meta", "pow_csd", "pow_ct", "res_2021", "res_series",
-          "res_2016", "population",
+          "res_2016", "res_2021_detail", "population",
           "components", "commute", "business_counts", "io", "io_summary",
           "ct_population"]
 
@@ -1288,6 +1407,7 @@ def main(stages=None):
         "res_2021": lambda: load_res_2021(con, ont_csds),
         "res_series": lambda: load_res_series(con, ont_csds),
         "res_2016": lambda: load_res_2016(con, ont_csds),
+        "res_2021_detail": lambda: load_res_2021_detail(con, ont_csds),
         "population": lambda: load_population(con, ont_csds),
         "components": lambda: load_components(con),
         "commute": lambda: load_commute(con, ont_csds),
