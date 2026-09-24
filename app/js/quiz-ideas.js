@@ -431,11 +431,26 @@
         Math.round(100 * top[0].x / c.onT) + ' in every 100 jobs in Ontario.', picture: null },
       prior: 0.5, terms: ['place-of-work']
     }));
-    /* pairs among the eight largest, where one is clearly larger */
-    for (var a = 0; a < 8; a++) {
-      for (var b = a + 2; b < 8; b += 3) {
+    /* Pairs across ALL twenty industries, not the eight largest. Audit 7
+       found the basics 5% of the bank, and two industries - management of
+       companies, and other services - never asked about at all, because this
+       loop only ever looked at the top eight. Each industry may appear in
+       three pairs, so widening it adds basics without flooding the idea. */
+    var pairSeen = {}, pairWins = {};
+    for (var a = 0; a < top.length; a++) {
+      for (var b = a + 2; b < top.length; b += 3) {
         var A_ = top[a], B_ = top[b];
+        if (!A_.x || !B_.x || B_.x < 2000) continue;
         if (A_.x < 1.25 * B_.x) continue;
+        if (!H.clear(A_.x, B_.x)) continue;
+        /* three appearances each, and no industry the right answer more than
+           twice: the stem is the same sentence every time, so a repeated
+           winner reads as the same question (audit 2b, detector 6) */
+        if ((pairSeen[A_.k] || 0) >= 3 || (pairSeen[B_.k] || 0) >= 3) continue;
+        if ((pairWins[A_.k] || 0) >= 2) continue;
+        pairWins[A_.k] = (pairWins[A_.k] || 0) + 1;
+        pairSeen[A_.k] = (pairSeen[A_.k] || 0) + 1;
+        pairSeen[B_.k] = (pairSeen[B_.k] || 0) + 1;
         out.push(it({
           id: 'G1:pair:' + D.naics[A_.k].code + '/' + D.naics[B_.k].code,
           idea: 'key', level: 1, form: 'on-pair', chip: CHIP_ON,
@@ -743,6 +758,12 @@
         it.idea = cl === 'small' ? 'small' : cl === 'big' ? 'big' : 'key';
         it.level = 2; return true;
       case 'occupation': it.idea = 'key'; it.level = 2; return true;
+      /* put three in order: plain size, no method in it, so it sits with the
+         other things true of every place (audit 3, 24 Sept) */
+      case 'order-three': it.idea = 'every'; it.level = 2; return true;
+      /* the myth belongs with the key industries: it is the whole point of a
+         location quotient, stated as a claim */
+      case 'share-vs-on': it.idea = 'key'; it.level = 2; return true;
       case 'fingerprint':
         it.idea = cl === 'small' ? 'smalldiff' : cl === 'big' ? 'bigdiff' : 'key';
         it.level = 3; return true;

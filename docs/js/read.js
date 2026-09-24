@@ -30,6 +30,8 @@
   var token = 0;                /* invalidates callbacks from a stopped run */
 
   R.available = function () {
+    if (typeof document !== 'undefined' && document.body &&
+        document.body.classList.contains('is-quiet')) return false;
     return typeof window !== 'undefined' && 'speechSynthesis' in window;
   };
 
@@ -48,8 +50,18 @@
   /* Read these, in document order. The selector doubles as the definition of
      "what this panel actually says": everything else on screen is either a
      control, a chart, or a table that speech cannot usefully carry. */
+  /* summary / dt / dd carry the glossary's whole explanation, the timeline's
+     dates and headlines, and the heading of every fold. Without them the
+     reader heard the question and not the caveat: on a phone foldLong() puts
+     most caveats inside a closed <details> (audit 8, 24 Sept). */
   var SAY = [
     '[data-read]', '[data-say]', 'h1', 'h2', 'h3', 'p', 'li',
+    'summary', 'dt', 'dd',
+    /* the app's own prose, written as spans: the Learn tiles, the glossary
+       entry and its plain line, the timeline date and headline, the big-idea
+       rows. Read-aloud skipped all of them (audit 8). */
+    '.hq-q', '.hq-a', '.lname', '.lplain', '.tl-date', '.tl-title',
+    '.qidea-title', '.qidea-s',
     '.card-note', '.card-foot', '.gloss', '.empty', '.stat', '.peek-answer'
   ].join(',');
 
@@ -84,8 +96,11 @@
       }
       if (n.closest && n.closest('table')) return;
       /* Hidden. offsetParent is null for position:fixed elements too, which
-         would silently skip anything in a pinned bar or bottom sheet. */
-      if (!n.getClientRects().length) return;
+         would silently skip anything in a pinned bar or bottom sheet.
+         A closed <details> is NOT hidden for this purpose: its text is on the
+         page, one tap away, and it is where the caveats live. It is opened
+         when the reader reaches it (see mark()). */
+      if (!n.getClientRects().length && !n.closest('details')) return;
 
       var text;
       if (n.hasAttribute('data-say')) {
@@ -134,6 +149,14 @@
   function mark(node) {
     clearMark();
     if (!node) return;
+    /* open whatever fold the sentence lives in, so the words being spoken are
+       the words on screen */
+    var d = node.closest ? node.closest('details:not([open])') : null;
+    while (d) {
+      d.open = true;
+      d = d.parentNode && d.parentNode.closest
+        ? d.parentNode.closest('details:not([open])') : null;
+    }
     node.classList.add('reading');
     marked = node;
     /* The old reader never scrolled, so on a long panel the position marker

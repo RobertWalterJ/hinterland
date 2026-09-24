@@ -353,11 +353,16 @@
       }
       pts.push('Across much of Ontario, deaths now outnumber births, so growth depends ' +
         'on people moving in.');
-      pts.push('Trade deals, the auto industry and new municipal boundaries shaped the ' +
-        'economy the numbers show.');
+      /* history.js keeps the sourced arc and the data juxtaposed, never
+         joined by "because". "Shaped" was a cause. */
+      pts.push('Trade deals, the auto industry and new municipal boundaries run ' +
+        'alongside these numbers. The timeline dates them; it does not explain them.');
     } else if (id === 'methods') {
+      /* terms.js and METHODS 2.4 both say shift-share does NOT say why: it is
+         an accounting split. The lesson may not claim more than the method. */
       pts.push('Every number here comes from a method with a name. A <b>location ' +
-        'quotient</b> says how concentrated work is; <b>shift-share</b> says why jobs grew.');
+        'quotient</b> says how concentrated work is; <b>shift-share</b> splits a ' +
+        'change in jobs into three parts.');
       pts.push('Every census count has some uncertainty. A small difference may be noise, ' +
         'so the tool only calls a difference when it is clearly bigger than that.');
     }
@@ -426,11 +431,26 @@
         Math.round(100 * top[0].x / c.onT) + ' in every 100 jobs in Ontario.', picture: null },
       prior: 0.5, terms: ['place-of-work']
     }));
-    /* pairs among the eight largest, where one is clearly larger */
-    for (var a = 0; a < 8; a++) {
-      for (var b = a + 2; b < 8; b += 3) {
+    /* Pairs across ALL twenty industries, not the eight largest. Audit 7
+       found the basics 5% of the bank, and two industries - management of
+       companies, and other services - never asked about at all, because this
+       loop only ever looked at the top eight. Each industry may appear in
+       three pairs, so widening it adds basics without flooding the idea. */
+    var pairSeen = {}, pairWins = {};
+    for (var a = 0; a < top.length; a++) {
+      for (var b = a + 2; b < top.length; b += 3) {
         var A_ = top[a], B_ = top[b];
+        if (!A_.x || !B_.x || B_.x < 2000) continue;
         if (A_.x < 1.25 * B_.x) continue;
+        if (!H.clear(A_.x, B_.x)) continue;
+        /* three appearances each, and no industry the right answer more than
+           twice: the stem is the same sentence every time, so a repeated
+           winner reads as the same question (audit 2b, detector 6) */
+        if ((pairSeen[A_.k] || 0) >= 3 || (pairSeen[B_.k] || 0) >= 3) continue;
+        if ((pairWins[A_.k] || 0) >= 2) continue;
+        pairWins[A_.k] = (pairWins[A_.k] || 0) + 1;
+        pairSeen[A_.k] = (pairSeen[A_.k] || 0) + 1;
+        pairSeen[B_.k] = (pairSeen[B_.k] || 0) + 1;
         out.push(it({
           id: 'G1:pair:' + D.naics[A_.k].code + '/' + D.naics[B_.k].code,
           idea: 'key', level: 1, form: 'on-pair', chip: CHIP_ON,
@@ -716,10 +736,20 @@
         if (!hi || !lo || !hi.pop2021 || !lo.pop2021) return false;
         if (lo.pop2021 < 1.2 * hi.pop2021) return false;
         it.idea = 'links'; it.level = 3;
-        it.stem = H.optName(lo) + ' has more people. Which has more jobs?';
-        it.card.sentence = H.optName(hi) + ': ' + H.about(H.total(H.vec(hi.code, 'total'))) +
-          ' jobs, against ' + H.about(H.total(H.vec(lo.code, 'total'))) +
-          '. People travel in to work.';
+        /* The stem must not name an option. Naming the place with more PEOPLE
+           made the other option right every time: 81 of 81, so a reader who
+           knew nothing scored every one of them (audit 4, 24 Sept). The
+           surprise moves to the card, where it teaches instead of telling. */
+        it.stem = 'Which of these two has more jobs?';
+        /* The closing clause is a comparison, so it is gated like the rest:
+           said only where jobs clearly outnumber working residents. Two items
+           had it the wrong way round - the winner sent more workers out than
+           it drew in. */
+        var inflow = H.clear(hi.jobs, hi.residentWorkersFixed);
+        it.card.sentence = H.optName(lo) + ' has more people, yet ' + H.optName(hi) +
+          ' has more jobs: ' + H.about(H.total(H.vec(hi.code, 'total'))) + ' against ' +
+          H.about(H.total(H.vec(lo.code, 'total'))) +
+          (inflow ? '. People travel in to work.' : '.');
         it.surprise = 1;
         return true;
       }
@@ -728,6 +758,12 @@
         it.idea = cl === 'small' ? 'small' : cl === 'big' ? 'big' : 'key';
         it.level = 2; return true;
       case 'occupation': it.idea = 'key'; it.level = 2; return true;
+      /* put three in order: plain size, no method in it, so it sits with the
+         other things true of every place (audit 3, 24 Sept) */
+      case 'order-three': it.idea = 'every'; it.level = 2; return true;
+      /* the myth belongs with the key industries: it is the whole point of a
+         location quotient, stated as a claim */
+      case 'share-vs-on': it.idea = 'key'; it.level = 2; return true;
       case 'fingerprint':
         it.idea = cl === 'small' ? 'smalldiff' : cl === 'big' ? 'bigdiff' : 'key';
         it.level = 3; return true;

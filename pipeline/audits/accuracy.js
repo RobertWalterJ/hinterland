@@ -174,6 +174,11 @@ function fmt(x) {
   const CELLS = D.naics.length;                 /* cells behind a place total */
   const clear = (a, b) => M.clearlyLarger(a, b, 3);
   const ONT = W('35', 'total'), ONT_T = sum(ONT);
+  /* the app's own rule for the name an option carries, borrowed rather than
+     re-implemented: bilingual names are shortened before they reach an
+     option, and a checker that did not know that read the shortening as a
+     wrong name */
+  const optNameOf = G.quizBank._gates.optName;
 
   /* ---------------------------------------------- (b) the name universes */
 
@@ -560,6 +565,91 @@ function fmt(x) {
               }
             }
           }
+        }
+        break;
+      }
+
+      /* ------------------------------------------- A/order-three (new,
+         24 Sept). Card: "X has about N jobs, Y about M, and Z about K."
+         Every figure is recomputed, both separations are re-tested on both
+         measures, and the ordering the correct option states is compared
+         with the ordering the payload gives. */
+      case 'order-three': {
+        const where = srcLine('quiz-bank.js', "' jobs, ' + names[1]");
+        const m = s.match(/^(.+?) has (?:about )?([\d,]+) jobs, (.+?) (?:about )?([\d,]+), and (.+?) (?:about )?([\d,]+)\.$/);
+        if (!m) { hard('P', 'number', it.id, 'card shape', s, '(unparsed)', where); break; }
+        const nm = [m[1], m[3], m[5]], said = [m[2], m[4], m[6]];
+        const codes = it.id.slice(3).split('-');
+        const tot = codes.map((c) => sum(W(c)));
+        const totU = codes.map((c) => sum(W(c, 'usual')));
+        nm.forEach((x, i) => {
+          name(it.id, 'place ' + (i + 1) + ' on the card', x, placeNames,
+               'the place list', where);
+          num('HARD', it.id, 'jobs in ' + x, said[i], tot[i], 'about', CELLS, where);
+          /* the card must name the places in the order it ranks them. The
+             comparison goes through the app's own option-name rule: a
+             bilingual name ("West Nipissing / Nipissing Ouest") is shortened
+             before it reaches an option, and the first run of this check
+             read that shortening as two wrong names. */
+          counted.name++;
+          const want = D.byCode[codes[i]];
+          if (!want || optNameOf(want) !== x) {
+            hard('B', 'name', it.id, 'place ' + (i + 1) + ' on the card', x,
+                 want ? optNameOf(want) : codes[i], where);
+          }
+        });
+        counted.comparison += 4;
+        if (!clear(tot[0], tot[1])) {
+          hard('C', 'comparison', it.id, 'first clearly above second (G1)',
+               tot[0] + ' vs ' + tot[1], 'not separated at z=3', where);
+        }
+        if (!clear(tot[1], tot[2])) {
+          hard('C', 'comparison', it.id, 'second clearly above third (G1)',
+               tot[1] + ' vs ' + tot[2], 'not separated at z=3', where);
+        }
+        if (!clear(totU[0], totU[1]) || !clear(totU[1], totU[2])) {
+          hard('C', 'comparison', it.id, 'order holds without home-workers (G8)',
+               totU.join(' > '), 'not separated at z=3 on "usual"', where);
+        }
+        counted.comparison++;
+        const wanted = nm.join(', then ');
+        if (correct.label !== wanted) {
+          hard('C', 'comparison', it.id, 'the ordering marked correct',
+               correct.label, wanted, where);
+        }
+        break;
+      }
+
+      /* ------------------------------------------ B/share-vs-on (new,
+         24 Sept). Card: "S is N% of the jobs located in X, against M%
+         across Ontario." Both shares recompute, and True/False is re-derived
+         from the separation test rather than taken on trust. */
+      case 'share-vs-on': {
+        const where = srcLine('quiz-bank.js', "' across Ontario.'");
+        const m = s.match(/^(.+?) is (\d+)% of the jobs located in (.+?), against (\d+)% across Ontario\.$/);
+        if (!m) { hard('P', 'number', it.id, 'card shape', s, '(unparsed)', where); break; }
+        name(it.id, 'sector on the card', m[1], sectorNames, 'the NAICS labels', where);
+        name(it.id, 'place on the card', m[3], placeNames, 'the place list', where);
+        const k = D.naics.map((x, i) => i).filter(
+          (i) => D.naics[i].short === m[1])[0];
+        if (k == null) break;
+        const vt = W(it.place), vu = W(it.place, 'usual');
+        const tt = sum(vt), tu = sum(vu);
+        num('HARD', it.id, 'share in ' + m[3], m[2], 100 * vt[k] / tt, 'print', CELLS, where);
+        num('HARD', it.id, 'share across Ontario', m[4], 100 * ONT[k] / ONT_T,
+            'print', CELLS, where);
+        const e = tt * (ONT[k] / ONT_T), eu = tu * (ONT[k] / ONT_T);
+        const over = clear(vt[k], e) && clear(vu[k] || 0, eu);
+        const under = clear(e, vt[k]) && clear(eu, vu[k] || 0);
+        counted.comparison += 2;
+        if (!over && !under) {
+          hard('C', 'comparison', it.id, 'place share separated from Ontario (G1, G8)',
+               vt[k] + ' vs ' + Math.round(e) + ' expected', 'not separated at z=3', where);
+        }
+        const saysTrue = correct.label === 'True';
+        if (saysTrue !== over) {
+          hard('C', 'comparison', it.id, 'the answer marked correct',
+               correct.label, over ? 'True' : 'False', where);
         }
         break;
       }

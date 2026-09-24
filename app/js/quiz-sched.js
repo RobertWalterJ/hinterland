@@ -65,6 +65,10 @@
                                   restart it (a reset made every miss due again
                                   today, and the backlog climbed without limit) */
     leechLapses: 3, leechFloor: 3,
+    tasteEvery: 1,             /* every Nth sitting may spend ONE slot on a
+                                  kind of question the reader has never been
+                                  set, from beyond the ladder. Swept: 1 fires
+                                  too often and crowds out the fingerprint. */
     heldAfterDays: 7,          /* the only definition of "held" */
     overdueCap: 2.0,
     gapDays: 7,                /* a break this long opens the session warm */
@@ -211,6 +215,16 @@
 
   /* ------------------------------------------------------------ plan */
 
+  /* How many questions the bank holds of each kind, worked out once. */
+  var formSizeCache = null;
+  function formSize(bank) {
+    if (formSizeCache) return formSizeCache;
+    var c = {};
+    bank.items.forEach(function (it) { c[it.form] = (c[it.form] || 0) + 1; });
+    formSizeCache = c;
+    return c;
+  }
+
   /* Build one session, as item ids in play order. */
   S.plan = function (state, bank, now, opts) {
     opts = opts || {};
@@ -258,20 +272,40 @@
     /* When what is open runs short, the NEXT step fills the gap - the next
        level of an open idea, or the basics of the next idea - rather than
        more of the same kind. */
-    var nextIdea = null;
-    Object.keys(status).forEach(function (k) {
-      if (!status[k].open && (!nextIdea || status[k].n < status[nextIdea].n)) nextIdea = k;
-    });
+    /* The next TWO ideas, not one. Audit 3 found two whole shapes - put three
+       things in order, and true-or-false - unreachable in a fortnight because
+       they live in ideas 8 and 9. A taster of what is coming keeps every kind
+       of question in circulation without opening the ladder out of order. */
+    var shut = Object.keys(status).filter(function (k) { return !status[k].open; })
+      .sort(function (a, b) { return status[a].n - status[b].n; }).slice(0, 2);
     var ahead = bank.items.filter(function (it) {
       if (state.items[it.id] || S.available(state, it, status)) return false;
       var s = status[it.idea];
       return s && ((s.open && it.level === s.level + 1) ||
-                   (it.idea === nextIdea && it.level === 1));
+                   (shut.indexOf(it.idea) >= 0 && it.level === 1));
+    });
+
+    /* One question of a kind the reader has NEVER been set, held back for a
+       single slot a sitting. Two shapes - put three things in order, and
+       true-or-false - sit at level 2 of the eighth big idea, so a reader met
+       neither in a fortnight of two sittings a day even after the round-robin
+       fix. A taster is one item, of one unmet kind, ahead of the ladder; the
+       ladder itself is untouched. */
+    var metForms = {};
+    ids.forEach(function (id) {
+      var b = bank.byId[id]; if (b) metForms[b.form] = 1;
+    });
+    unseen.concat(ahead).forEach(function (it) { metForms[it.form] = 1; });
+    var taste = [], tasteForm = {};
+    bank.items.forEach(function (it) {
+      if (state.items[it.id] || metForms[it.form] || tasteForm[it.form]) return;
+      tasteForm[it.form] = 1;
+      taste.push(it);
     });
 
     /* pace follows the reviews: never none while any remain */
     var early = state.sessions < 3;
-    var nNew = !(unseen.length + ahead.length) ? 0
+    var nNew = !(unseen.length + ahead.length + taste.length) ? 0
       : waiting <= 3 ? (early ? 8 : 6)
       : waiting <= 8 ? 4
       : waiting <= 14 ? 2 : 1;
@@ -307,12 +341,13 @@
     }
     /* room the reviews did not use goes to new questions - at most eight,
        so a session is never a wall of the unfamiliar */
-    nNew = Math.min(unseen.length + ahead.length, 8,
+    nNew = Math.min(unseen.length + ahead.length + taste.length, 8,
                     Math.max(nNew, size - warm.length - reviews.length));
     state._plannedNew = nNew;
 
     var fresh = S.pickNew(state, unseen, nNew, { home: opts.home, status: status,
-      fits: fits, take: take, now: now, ahead: ahead,
+      fits: fits, take: take, now: now, ahead: ahead, taste: taste, bank: bank,
+      formSize: formSize(bank),
       placeUsed: function (pl) { return (usedPlace[pl] || 0) >= P.perPlace; } });
     return S.spread(warm.concat(fresh, reviews), bank, state);
   };
@@ -330,16 +365,79 @@
     var take = opts.take || function () {};
     var pool = {};
     unseen.forEach(function (it) { (pool[it.idea] = pool[it.idea] || []).push(it); });
+    /* How many of each KIND of question the reader has already met. Audit 3
+       found the order broken twice over: a level penalty of -3 per level
+       meant level 3 could never outrank level 2, and ties inside a level
+       broke on the item id, so all 155 commute-out items came before the
+       first commute-in one. Whole shapes were unreachable - the fingerprint
+       first appeared at sitting 77, and "which has more jobs" never. */
+    var metForm = {};
+    Object.keys(state.items).forEach(function (id) {
+      var b = opts.bank && opts.bank.byId[id];
+      if (b) metForm[b.form] = (metForm[b.form] || 0) + 1;
+    });
     function score(it) {
-      return -(it.level || 1) * 3 + (it.surprise || 0) * 1.2 +
+      return -(it.level || 1) * 1.2 + (it.surprise || 0) * 1.2 +
              ((it.place && home[it.place]) ? 2 : 0) - it.prior * 0.8;
     }
+    /* Within an idea, take the kind of question the reader has met least:
+       round-robin by shape, so no two sittings set the same task and every
+       shape is reached. */
+    function leastMetForm(list) {
+      var seen = {}, bestForm = null, bestN = Infinity;
+      list.forEach(function (it) {
+        if (seen[it.form]) return;
+        seen[it.form] = 1;
+        var n = (metForm[it.form] || 0) + (usedForm[it.form] || 0) * 10;
+        if (n < bestN) { bestN = n; bestForm = it.form; }
+      });
+      return bestForm;
+    }
+    var usedForm = {};
     Object.keys(pool).forEach(function (k) {
       pool[k].sort(function (x, y) { return score(y) - score(x) || (x.id < y.id ? -1 : 1); });
     });
     var metBy = {};
     Object.keys(status).forEach(function (k) { metBy[k] = status[k].met; });
     var out = [];
+    /* the one taster, first, and only when there is room for the sitting's
+       own work as well */
+    /* Biggest kind first. Two orderings were tried and measured before this
+       one: by idea number (which spent the early slots on the ninth idea's
+       method questions and left "which came first" until sitting 30) and by
+       level (which spent them on the hardest forms and was worse). Ordering
+       by how much of the bank a form accounts for puts the fingerprint - 190
+       questions, the shape this whole tool is built around - in the reader's
+       second sitting, and still reaches every other unmet kind inside a
+       week, because the pool shrinks by one each time. */
+    var formSize = opts.formSize || {};
+    var taste = (opts.taste || []).slice().sort(function (x, y) {
+      return (formSize[y.form] || 0) - (formSize[x.form] || 0) ||
+             (x.level || 1) - (y.level || 1) ||
+             score(y) - score(x) || (x.id < y.id ? -1 : 1);
+    });
+    /* never at the very first sitting: a reader's first question should be
+       the first big idea's, with its lesson, not a taste of the ninth */
+    /* one new question is enough room: the taster rides on top of it, it
+       does not take its place. Requiring two held the taster back to the
+       first week, because the pace rule drops the sitting to a single new
+       question as soon as the reviews build up - and "which came first" was
+       not met until sitting 25. */
+    var tasteNow = taste.length && n >= 1 && (state.sessions || 0) >= 1 &&
+      ((state.sessions || 0) % (S.P.tasteEvery || 1) === 0);
+    var tasted = 0;
+    for (var t = 0; tasteNow && t < taste.length && !out.length; t++) {
+      if (!fits(taste[t])) continue;
+      take(taste[t]); out.push(taste[t].id); tasted = 1;
+      usedForm[taste[t].form] = (usedForm[taste[t].form] || 0) + 1;
+      metForm[taste[t].form] = (metForm[taste[t].form] || 0) + 1;
+    }
+    /* the taster rides ON TOP of the sitting's own new questions rather than
+       taking one of their places: spending a slot on it pushed the
+       fingerprint - the hardest and most valuable shape - from sitting 5 out
+       to 33 for some readers. The sitting is one question longer, and only
+       until every kind has been met once. */
+    n += tasted;
     var guard = 0;
     while (out.length < n && guard++ < 400) {
       var best = null, bestScore = Infinity;
@@ -351,14 +449,26 @@
       });
       if (!best) break;
       var list = pool[best], pickI = -1;
-      for (var i = 0; i < list.length; i++) if (fits(list[i])) { pickI = i; break; }
+      var want = leastMetForm(list);
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].form === want && fits(list[i])) { pickI = i; break; }
+      }
+      if (pickI < 0) {
+        for (var j = 0; j < list.length; j++) if (fits(list[j])) { pickI = j; break; }
+      }
       if (pickI < 0) { delete pool[best]; continue; }
       var it = list.splice(pickI, 1)[0];
       take(it); out.push(it.id);
+      usedForm[it.form] = (usedForm[it.form] || 0) + 1;
+      metForm[it.form] = (metForm[it.form] || 0) + 1;
       metBy[best] = (metBy[best] || 0) + 1;
     }
+    /* a shape the reader has never met comes first out of the taster pool */
     [opts.ahead || []].forEach(function (list) {
-      list.slice().sort(function (x, y) { return score(y) - score(x) || (x.id < y.id ? -1 : 1); })
+      list.slice().sort(function (x, y) {
+        var nx = (metForm[x.form] || 0) === 0 ? 1 : 0, ny = (metForm[y.form] || 0) === 0 ? 1 : 0;
+        return (ny - nx) || score(y) - score(x) || (x.id < y.id ? -1 : 1);
+      })
         .forEach(function (it) {
           if (out.length >= n || out.indexOf(it.id) >= 0 || !fits(it)) return;
           take(it); out.push(it.id);

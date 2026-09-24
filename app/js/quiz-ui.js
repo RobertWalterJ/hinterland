@@ -102,7 +102,14 @@
      been introduced to is preceded by that idea's lesson. */
   function lessonCheck() {
     var it = current();
-    if (it && it.idea && I && !st().lessons[it.idea]) run.phase = 'lesson';
+    if (!it || !it.idea || !I || st().lessons[it.idea]) return;
+    /* A taster - one question from a big idea that has not opened yet, so
+       that every KIND of question is met early (audit 3) - must not announce
+       "Big idea 9 of 9" at the first sitting. It is asked on its own, and the
+       idea gets its proper lesson when the ladder reaches it. */
+    var status = S.ideas(st(), B.build());
+    if (status[it.idea] && !status[it.idea].open) return;
+    run.phase = 'lesson';
   }
 
   function stopReading() { if (R) R.stop(); }
@@ -196,7 +203,11 @@
     /* four rows, not five: the fifth pushed Next below the fold on a phone
        and said nothing the first four had not (audit 5) */
     return v.map(function (x, i) { return { i: i, x: x || 0 }; })
-      .sort(function (a, b) { return b.x - a.x; }).slice(0, 4)
+      /* three bars, not four. On a phone each bar row is two lines since the
+         labels were allowed to wrap (audit 5, F8), and the fourth pushed
+         Next below the fold on the profile answers - the only answer screen
+         still doing it after the rest of audit 5 was fixed. */
+      .sort(function (a, b) { return b.x - a.x; }).slice(0, 3)
       .map(function (r) {
         return { l: D.naics[r.i].short, v: r.x, t: Math.round(100 * r.x / t) + '%' };
       });

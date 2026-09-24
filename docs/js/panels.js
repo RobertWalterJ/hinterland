@@ -229,7 +229,7 @@
       '<div class="eyebrow">' + C.esc(p.kind) +
       (p.level === 'CSD' && p.cd && D.geo.cd_names[p.cd]
         ? ' · ' + C.esc(D.geo.cd_names[p.cd]) : '') + '</div>' +
-      '<h2 style="font-size:26px;margin:2px 0 14px">' +
+      '<h2 style="font-size:1.625rem;margin:2px 0 14px">' +
       C.esc(p.level === 'CT' ? D.tractLabel(p.code).title : p.name) + '</h2>' +
       '<div class="hero">' +
       stat(C.fmt(ctx.jobs), 'jobs located here',
@@ -466,11 +466,11 @@
       row.style.cssText = 'margin-bottom:14px';
       row.innerHTML =
         '<div style="display:flex;justify-content:space-between;align-items:baseline">' +
-        '<span style="font-weight:550;font-size:13.5px">' + it.label + '</span>' +
+        '<span style="font-weight:550;font-size:0.8438rem">' + it.label + '</span>' +
         '<span class="num" style="font-weight:650">' + it.fmt(it.v) + '</span></div>';
       var mh = document.createElement('div');
       row.appendChild(mh);
-      row.appendChild(h('<div style="font-size:11.5px;color:var(--ink-3);' +
+      row.appendChild(h('<div style="font-size:0.7188rem;color:var(--ink-3);' +
         'line-height:1.45;margin-top:2px">' + it.help + '</div>'));
       wrap.appendChild(row);
       afterLayout(function () {
@@ -782,9 +782,9 @@
     selTo.addEventListener('change', function () {
       ctx.state.y1 = +selTo.value; A.render();
     });
-    ctl.appendChild(h('<span style="font-size:13px;color:var(--ink-3)">From</span>'));
+    ctl.appendChild(h('<span style="font-size:0.8125rem;color:var(--ink-3)">From</span>'));
     ctl.appendChild(selFrom);
-    ctl.appendChild(h('<span style="font-size:13px;color:var(--ink-3)">to</span>'));
+    ctl.appendChild(h('<span style="font-size:0.8125rem;color:var(--ink-3)">to</span>'));
     ctl.appendChild(selTo);
 
     var t1 = h('<label class="toggle"><input type="checkbox"' +
@@ -1086,7 +1086,7 @@
     ], ctx.state.peerMode, function (v) {
       ctx.state.peerMode = v; A.render();
     }));
-    ctl.appendChild(h('<span style="font-size:13px;color:var(--ink-3)">' +
+    ctl.appendChild(h('<span style="font-size:0.8125rem;color:var(--ink-3)">' +
       'from a pool of ' + C.fmt(pe.poolSize) + '</span>'));
     host.appendChild(ctl);
 
@@ -1147,7 +1147,7 @@
       { key: 'div', label: 'Diversity', type: 'dec', dp: 3 },
       { key: 'act', label: '', render: function (r) {
           return r._self ? '' :
-            '<button class="btn btn-ghost" style="padding:2px 8px;font-size:12px" ' +
+            '<button class="btn btn-ghost" style="padding:2px 8px;font-size:0.75rem" ' +
             'data-drop="' + r._code + '">remove</button>';
         } }
     ];
@@ -1186,7 +1186,7 @@
     if (ctx.state.peerRemoved.length) {
       var rb = h('<div class="card-foot">' + ctx.state.peerRemoved.length +
         ' removed. <button class="btn btn-ghost" style="padding:2px 8px;' +
-        'font-size:12px">restore all</button></div>');
+        'font-size:0.75rem">restore all</button></div>');
       rb.querySelector('button').addEventListener('click', function () {
         ctx.state.peerRemoved = []; A.render();
       });
@@ -1244,9 +1244,9 @@
 
       var box = h('<div style="padding:10px 0;border-bottom:1px solid var(--line)">' +
         '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">' +
-        '<span style="font-weight:550;font-size:13.5px">' + C.esc(mt.label) + '</span>' +
+        '<span style="font-weight:550;font-size:0.8438rem">' + C.esc(mt.label) + '</span>' +
         '<span class="num" style="font-weight:650">' + mt.fmt(mine) + '</span></div>' +
-        '<div style="font-size:12px;color:var(--ink-3)">peer median ' +
+        '<div style="font-size:0.75rem;color:var(--ink-3)">peer median ' +
         mt.fmt(med) + (rank ? ' · ranks ' + rank + ' of ' + (sorted.length + 1) : '') +
         (pctl != null ? ' · ' + Math.round(pctl * 100) + 'th percentile' : '') +
         '</div></div>');
@@ -1368,7 +1368,7 @@
       ctx.state.hoodSector = +sectorSel.value; A.render();
     });
     var ctl = h('<div class="ctlrow"></div>');
-    ctl.appendChild(h('<span style="font-size:13px;color:var(--ink-3)">Show</span>'));
+    ctl.appendChild(h('<span style="font-size:0.8125rem;color:var(--ink-3)">Show</span>'));
     ctl.appendChild(sectorSel);
     host.appendChild(ctl);
 
@@ -2059,13 +2059,23 @@
 
     meta.sources.forEach(function (s) {
       var c = card(s.title, null, { badge: s.vintage || '' });
-      c.appendChild(h('<p style="font-size:13.5px;line-height:1.6;margin:4px 0 10px">' +
+      c.appendChild(h('<p style="font-size:0.8438rem;line-height:1.6;margin:4px 0 10px">' +
         '<b>Used for:</b> ' + C.esc(s.purpose) + '</p>'));
-      c.appendChild(h('<p style="font-size:13.5px;line-height:1.6;margin:0 0 10px;' +
+      c.appendChild(h('<p style="font-size:0.8438rem;line-height:1.6;margin:0 0 10px;' +
         'color:var(--ink-2)"><b>Cannot be trusted to say:</b> ' +
         C.esc(s.caveats) + '</p>'));
+      /* the credit the licence asks for, generated from the source the app
+         actually loaded rather than typed onto a screen (audit 8) */
+      if (s.attribution) {
+        c.appendChild(h('<p class="card-note" style="margin:0 0 10px">' +
+          '<b>Licence:</b> ' + C.esc(s.attribution) +
+          (s.licence ? ' Released under the ' +
+            (s.licence_url ? '<a href="' + C.esc(s.licence_url) +
+              '" target="_blank" rel="noopener">' + C.esc(s.licence) + '</a>'
+              : C.esc(s.licence)) + '.' : '') + '</p>'));
+      }
       c.appendChild(h('<div class="card-foot" style="font-family:var(--mono);' +
-        'font-size:11.5px">' + C.esc(s.cite || '') +
+        'font-size:0.7188rem">' + C.esc(s.cite || '') +
         (s.rows_loaded ? '<br>' + C.fmt(s.rows_loaded) + ' rows loaded' : '') +
         '</div>'));
       host.appendChild(c);

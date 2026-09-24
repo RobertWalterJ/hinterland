@@ -43,6 +43,7 @@
   H.timeline = [
     { year: 1965, date: '16 January 1965',
       title: 'The Canada–US Auto Pact',
+      label: 'The Auto Pact',
       fact: 'Canada and the United States signed an agreement on automotive ' +
         'products that let vehicles and parts cross the border without ' +
         'tariffs for qualifying makers. It came into force in September 1966.',
@@ -53,6 +54,7 @@
 
     { year: 1989, date: '1 January 1989',
       title: 'Canada–US Free Trade Agreement',
+      label: 'Canada–US free trade',
       fact: 'The Canada–United States Free Trade Agreement came into force, ' +
         'setting out to remove tariffs between the two countries.',
       source: { name: 'Global Affairs Canada',
@@ -61,6 +63,7 @@
 
     { year: 1994, date: '1 January 1994',
       title: 'NAFTA',
+      label: 'NAFTA takes effect',
       fact: 'The North American Free Trade Agreement, adding Mexico, came into ' +
         'force and replaced the Canada–US agreement.',
       source: { name: 'Global Affairs Canada',
@@ -69,6 +72,7 @@
 
     { year: 1998, date: '1 January 1998',
       title: 'The new City of Toronto',
+      label: 'Toronto amalgamated',
       fact: 'Metropolitan Toronto and its six municipalities — East York, ' +
         'Etobicoke, North York, Scarborough, Toronto and York — were ' +
         'dissolved into a single City of Toronto.',
@@ -79,6 +83,7 @@
 
     { year: 2001, date: '1 January 2001',
       title: 'Hamilton, Ottawa and Greater Sudbury restructured',
+      label: 'Cities restructured',
       fact: 'Four regional municipalities were replaced by the Cities of ' +
         'Hamilton, Ottawa and Greater Sudbury and the Towns of Haldimand ' +
         'and Norfolk.',
@@ -89,6 +94,7 @@
 
     { year: 2001, date: '18 February 2001',
       title: 'The Auto Pact’s duty exemption ends',
+      label: 'Auto Pact duties end',
       fact: 'After a World Trade Organization ruling against it, adopted in ' +
         'June 2000, Canada withdrew the duty-free treatment the Auto Pact ' +
         'had given qualifying car makers.',
@@ -99,6 +105,7 @@
 
     { year: 2005, date: '2005',
       title: 'Ontario’s Greenbelt',
+      label: 'The Greenbelt',
       fact: 'The Greenbelt Act created a protected belt of farmland and natural ' +
         'areas of over 800,000 hectares, running about 325 km from Rice Lake ' +
         'to the Niagara River.',
@@ -109,6 +116,7 @@
 
     { year: 2006, date: '16 June 2006',
       title: 'The Growth Plan for the Greater Golden Horseshoe',
+      label: 'The Growth Plan',
       fact: 'Ontario’s first growth plan directed growth to built-up areas ' +
         'and urban growth centres, and planned the region to 2031.',
       source: { name: 'Government of Ontario',
@@ -118,6 +126,7 @@
 
     { year: 2009, date: '2009',
       title: 'Rescuing the car makers',
+      label: 'The car-maker rescue',
       fact: 'The federal and Ontario governments committed up to US$9.5 billion ' +
         'to the restructuring of General Motors’ Canadian operations, ' +
         'alongside support for Chrysler.',
@@ -128,6 +137,7 @@
 
     { year: 2021, date: '2–8 May 2021',
       title: 'The census counts a pandemic week',
+      label: 'A pandemic census',
       fact: 'The 2021 Census measured work in one week of May 2021, during the ' +
         'pandemic’s third wave, when an unusual number of people were on ' +
         'reduced hours or laid off.',

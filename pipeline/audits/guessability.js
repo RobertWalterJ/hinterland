@@ -189,6 +189,16 @@ function pointVariant(it) {
 /* Two options that say the same thing. Under one-right-answer both must be
    wrong, so a reasoner eliminates two options at once. */
 function pointSame(it) {
+  /* An ORDERING item offers the same names in different orders, and the
+     order is the whole answer. core() sorts its tokens to catch a paraphrase,
+     which made all three orderings identical and failed 36 honest items on
+     24 Sept, the day the shape was added. A set of options that are all
+     permutations of one another is exempt - and only that set: two options
+     out of three sharing a multiset is still a duplicate. */
+  const cores = it.options.map((o) => core(o.label));
+  const seqs = it.options.map((o) => tokens(o.label).filter((w) => !FILLER.has(w)).join(' '));
+  if (it.options.length > 1 && cores.every((c) => c === cores[0]) &&
+      new Set(seqs).size === seqs.length) return null;
   const seen = {};
   for (let i = 0; i < it.options.length; i++) {
     const c = core(it.options[i].label);

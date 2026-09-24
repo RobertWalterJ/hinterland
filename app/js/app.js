@@ -112,9 +112,11 @@
       initHistory();
       bootEl.classList.add('gone');
       setTimeout(function () { if (bootEl.remove) bootEl.remove(); }, 400);
-      /* The tract layer and the polygons are not needed to answer the first
-         question, so they arrive after the first paint. */
-      D.loadBoundaries('csd');
+      /* The polygons are NOT fetched here. Measured (audit 6, 24 Sept): the
+         map file is 286 KB gzipped, a third of everything a first visit
+         downloaded, for a screen most readers never open. loadBoundaries
+         memoises and every map surface already calls it, so the file arrives
+         when a map is actually asked for. */
       registerWorker();
     }).catch(function (e) {
       clearInterval(spin);

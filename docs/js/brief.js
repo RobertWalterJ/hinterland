@@ -392,9 +392,9 @@
     var head = U.card(null, null);
     head.innerHTML =
       '<div class="eyebrow">Draft brief</div>' +
-      '<h2 style="font-size:23px;margin:3px 0 8px">' + C.esc(nm(place)) +
+      '<h2 style="font-size:1.4375rem;margin:3px 0 8px">' + C.esc(nm(place)) +
       ' — economic context</h2>' +
-      '<div style="font-size:13px;color:var(--ink-3);line-height:1.6">' +
+      '<div style="font-size:0.8125rem;color:var(--ink-3);line-height:1.6">' +
       C.esc(place.kind) + ' · compared with ' + C.esc(ctx.ref ? ctx.ref.label : '—') +
       (ctx.change && ctx.change.result
         ? ' · change measured ' + ctx.change.y0 + ' to ' + ctx.change.y1 : '') +
@@ -417,7 +417,7 @@
     prose.className = 'prose';
     prose.innerHTML = out.paras.map(function (p, i) {
       if (p.heading) {
-        return '<h3 style="font-size:14px;margin:1.6em 0 .5em;' +
+        return '<h3 style="font-size:0.875rem;margin:1.6em 0 .5em;' +
           'text-transform:uppercase;letter-spacing:.07em;font-weight:650;' +
           'color:var(--ink-3)">' + C.esc(p.heading) + '</h3>';
       }
@@ -442,7 +442,7 @@
       .filter(function (s) { return s.cite; })
       .map(function (s) { return s.cite; });
     cite.appendChild(root.GRA.ui.h('<div style="font-family:var(--mono);' +
-      'font-size:12px;line-height:1.75;color:var(--ink-2)">' +
+      'font-size:0.75rem;line-height:1.75;color:var(--ink-2)">' +
       citations.map(C.esc).join('<br>') + '</div>'));
     host.appendChild(cite);
 

@@ -417,8 +417,14 @@ function main(G) {
   L('');
   const holes = [];
 
-  holes.push(['The basics are 4% of the bank.',
-    lv[1] + ' of ' + items.length + ' questions are level 1, and six of the nine ideas ' +
+  /* the headline recomputes: a hard-coded 4% went stale the first time the
+     basics were widened, on 24 Sept */
+  const thinIdeas = I.IDEAS.filter((x) =>
+    items.filter((it) => it.idea === x.id && it.level === 1).length <= 3).length;
+  holes.push(['The basics are ' + Math.round(100 * lv[1] / items.length) +
+    '% of the bank.',
+    lv[1] + ' of ' + items.length + ' questions are level 1, and ' + thinIdeas +
+    ' of the nine ideas ' +
     'have three or fewer. A learner meeting an idea for the first time gets one or two ' +
     'basics and is then pushed into place-by-place detail.',
     'Fill with: the same class-level / class-lean / concept templates already in ' +

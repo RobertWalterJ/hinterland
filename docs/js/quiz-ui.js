@@ -102,7 +102,14 @@
      been introduced to is preceded by that idea's lesson. */
   function lessonCheck() {
     var it = current();
-    if (it && it.idea && I && !st().lessons[it.idea]) run.phase = 'lesson';
+    if (!it || !it.idea || !I || st().lessons[it.idea]) return;
+    /* A taster - one question from a big idea that has not opened yet, so
+       that every KIND of question is met early (audit 3) - must not announce
+       "Big idea 9 of 9" at the first sitting. It is asked on its own, and the
+       idea gets its proper lesson when the ladder reaches it. */
+    var status = S.ideas(st(), B.build());
+    if (status[it.idea] && !status[it.idea].open) return;
+    run.phase = 'lesson';
   }
 
   function stopReading() { if (R) R.stop(); }
@@ -193,8 +200,14 @@
     var v = D.workVec(code, 'total');
     if (!v) return [];
     var t = 0; v.forEach(function (x) { t += x || 0; });
+    /* four rows, not five: the fifth pushed Next below the fold on a phone
+       and said nothing the first four had not (audit 5) */
     return v.map(function (x, i) { return { i: i, x: x || 0 }; })
-      .sort(function (a, b) { return b.x - a.x; }).slice(0, 5)
+      /* three bars, not four. On a phone each bar row is two lines since the
+         labels were allowed to wrap (audit 5, F8), and the fourth pushed
+         Next below the fold on the profile answers - the only answer screen
+         still doing it after the rest of audit 5 was fixed. */
+      .sort(function (a, b) { return b.x - a.x; }).slice(0, 3)
       .map(function (r) {
         return { l: D.naics[r.i].short, v: r.x, t: Math.round(100 * r.x / t) + '%' };
       });
@@ -211,7 +224,7 @@
     }
     if (pic.kind === 'occupation') {
       var occ = D.occupationFor(pic.code) || [];
-      return '<div class="qpic">' + bars(occ.slice(0, 5).map(function (o) {
+      return '<div class="qpic">' + bars(occ.slice(0, 4).map(function (o) {
         return { l: o.short, v: o.n || 0, t: Math.round(100 * (o.share || 0)) + '%' };
       })) + '</div>';
     }
@@ -312,11 +325,15 @@
     wrap.className = 'quiz-wrap';
 
     var chip = it.chip.universe + (it.chip.when ? ' · ' + it.chip.when : '');
-    var ask = '<div class="qask">' +
-      '<p class="qchip" data-say="' + esc(chip.replace(' · ', ', ')) + '.">' +
-      esc(chip) + '</p>' +
+    /* Once the answer is on screen the chip and the question's own speaker
+       have done their work, and they were pushing Next below the fold
+       (audit 5, F2). The stem stays. */
+    var asking = run.phase === 'ask';
+    var ask = '<div class="qask' + (asking ? '' : ' is-answered') + '">' +
+      (asking ? '<p class="qchip" data-say="' + esc(chip.replace(' · ', ', ')) + '.">' +
+        esc(chip) + '</p>' : '') +
       '<div class="qline"><h2 class="qstem">' + esc(it.stem) + '</h2>' +
-      speaker('the question') + '</div>' +
+      (asking ? speaker('the question') : '') + '</div>' +
       (run.phase === 'ask' && it.prompt ? picture(it.prompt, true) : '') +
       '</div>';
 
@@ -345,7 +362,9 @@
       var cls = (o.correct ? ' is-right' : '') + (mine ? ' is-chosen' : '');
       var tag = o.correct && mine ? '✓ Your answer, right'
         : o.correct ? '✓ Right answer' : mine ? '✕ Your answer' : '';
-      return '<div class="qopt' + cls + '"><span class="qkey" aria-hidden="true">' +
+      return '<div class="qopt' + cls + '" data-say="' +
+        esc('Option ' + o.key + '. ' + o.label + '. ' + (tag ? tag.slice(2) : '')) +
+        '"><span class="qkey" aria-hidden="true">' +
         o.key + '</span><span class="qlabel">' + esc(o.label) +
         (tag ? '<span class="qtag">' + tag + '</span>' : '') + '</span></div>';
     }).join('') + '</div>';
@@ -358,8 +377,7 @@
       '<div class="qterms"></div>' +
       (it.place ? '<button type="button" class="linkbtn qshow">Show me ' +
         esc(D.byCode[it.place] ? D.byCode[it.place].name : '') + ' in full</button>' : '') +
-      '<p class="qsource">' + esc(sourceLine(it)) + '</p>' +
-      '<button type="button" class="linkbtn qmisread">That was a misread: ask me again</button>';
+      '<p class="qsource">' + esc(sourceLine(it)) + '</p>';
     var conf = '<div class="qconf" role="group" aria-label="Were you sure? Optional">' +
       '<span class="qconf-l">Were you sure? (optional)</span>' +
       [['sure', 'Sure'], ['think', 'Think so'], ['guess', 'Guessed']].map(function (c) {
@@ -373,6 +391,7 @@
       '<p class="qsentence">' + esc(it.card.sentence) + '</p>' +
       picture(it.card.picture, false) +
       conf +
+      '<button type="button" class="linkbtn qmisread">That was a misread: ask me again</button>' +
       '<details class="qmore"><summary>More about this answer</summary>' + moreBits +
       '</details>' +
       /* Next is the LAST thing, in the flow: never a bar pinned over the
@@ -390,6 +409,7 @@
 
   function autoRead(node) {
     if (!R || !R.available() || !settings().read || !node) return;
+    if (document.body.classList.contains('is-quiet')) return;
     setTimeout(function () { R.start(node); }, 60);
   }
 
@@ -656,8 +676,9 @@
         '<div class="qideas">' + ideas + '</div>' : '') +
       (showPractise ? '' : '<div hidden>') +
       '<details class="qsettings"><summary>Settings</summary><div class="qset">' +
-      '<label class="toggle"><input type="checkbox" class="qread"' +
-      (set.read ? ' checked' : '') + '> Read each question to me</label>' +
+      (A.isQuiet && A.isQuiet() ? '' :
+        '<label class="toggle"><input type="checkbox" class="qread"' +
+        (set.read ? ' checked' : '') + '> Read each question to me</label>') +
       '<label class="toggle"><input type="checkbox" class="qjump"' +
       (s.jumpAhead ? ' checked' : '') + '> Open every big idea now</label>' +
       '<label class="qhome">Your home region: <select class="sel qhomesel">' +
@@ -677,7 +698,8 @@
     if (qs) qs.addEventListener('click', function () {
       if (!QU.start()) qs.textContent = 'Nothing new just now. Come back later.';
     });
-    body.querySelector('.qread').addEventListener('change', function (e) {
+    var rd = body.querySelector('.qread');
+    if (rd) rd.addEventListener('change', function (e) {
       var x = settings(); x.read = e.target.checked; saveSettings(x);
     });
     body.querySelector('.qjump').addEventListener('change', function (e) {

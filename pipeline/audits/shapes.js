@@ -52,7 +52,9 @@ const TASKS = [
   { id: 'order-in-time', demand: 'order-in-time',
     what: 'Which of two events came first. Sequence, not size.' },
   { id: 'true-or-false', demand: 'true-or-false',
-    what: 'A yes/no claim about one place, with the reason restated in each button.' }
+    what: 'A yes/no claim about one place, with the reason restated in each button.' },
+  { id: 'put-in-order', demand: 'order-by-size',
+    what: 'Three places, three orderings of the same three names. Rank them by the jobs located in them. Added 24 Sept: the bank had no task that asked for a sequence by size.' }
 ];
 const TASK_IDS = TASKS.map((t) => t.id);
 
@@ -80,7 +82,9 @@ const BY_FORM = {
   cannot: 'judge-a-method',
   concept: 'judge-a-method',
   'which-first': 'order-in-time',
-  yesno: 'true-or-false'
+  yesno: 'true-or-false',
+  'share-vs-on': 'true-or-false',
+  'order-three': 'put-in-order'
 };
 
 /* A magnitude option set - every option is a quantity of the same kind -

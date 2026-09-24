@@ -587,7 +587,7 @@
       '<div class="sheet-body">' +
       (canShare ? '<div style="padding:0 8px 12px"><button type="button" ' +
         'class="btn btn-primary" data-fmt="share" style="width:100%;min-height:52px;' +
-        'justify-content:center;font-size:17px">Share the brief</button></div>' : '') +
+        'justify-content:center;font-size:1.0625rem">Share the brief</button></div>' : '') +
       '<p class="card-note" style="padding:0 8px">Every file carries its ' +
       'provenance: the workbook opens on a sheet naming the place, the ' +
       'benchmark, the period, every method used and every caveat that applies.</p>' +

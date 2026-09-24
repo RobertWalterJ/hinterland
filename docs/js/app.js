@@ -108,18 +108,21 @@
       var first = D.byCode[A.state.place];
       if (first && first.level === 'CT') D.loadTracts().then(A.render);
       wireReader();
+      document.body.classList.toggle('is-quiet', A.isQuiet());
       initHistory();
       bootEl.classList.add('gone');
       setTimeout(function () { if (bootEl.remove) bootEl.remove(); }, 400);
-      /* The tract layer and the polygons are not needed to answer the first
-         question, so they arrive after the first paint. */
-      D.loadBoundaries('csd');
+      /* The polygons are NOT fetched here. Measured (audit 6, 24 Sept): the
+         map file is 286 KB gzipped, a third of everything a first visit
+         downloaded, for a screen most readers never open. loadBoundaries
+         memoises and every map surface already calls it, so the file arrives
+         when a map is actually asked for. */
       registerWorker();
     }).catch(function (e) {
       clearInterval(spin);
       msg.innerHTML = '<b style="color:var(--brand)">Could not load the data.</b><br>' +
         C.esc(e.message) +
-        '<br><br style="font-size:12px">Open the app with <b>Launch Hinterland.bat' +
+        '<br><br style="font-size:0.75rem">Open the app with <b>Launch Hinterland.bat' +
         '</b> rather than by double-clicking index.html — the data files have ' +
         'to be served over http.';
       console.error(e);
@@ -821,6 +824,24 @@
     }
   };
 
+  /* Quiet mode, for a bus or a council chamber: one switch that turns the
+     sound off AND stops the app offering to read anything aloud, taking the
+     controls out of the layout rather than leaving dead buttons behind
+     (audit 8, 24 Sept). */
+  var QUIET = 'hinterland.quiet';
+  A.isQuiet = function () {
+    try { return localStorage.getItem(QUIET) === '1'; } catch (e) { return false; }
+  };
+  A.setQuiet = function (on) {
+    try { localStorage.setItem(QUIET, on ? '1' : '0'); } catch (e) {}
+    document.body.classList.toggle('is-quiet', !!on);
+    if (on) {
+      if (root.GRA.read) root.GRA.read.stop();
+      if (root.GRA.sound && root.GRA.sound.enabled) root.GRA.sound.setEnabled(false);
+    }
+    A.render();
+  };
+
   /* The header's "More" sheet: the things every screen used to carry. */
   A.openMenu = function () {
     var snd = root.GRA.sound;
@@ -831,6 +852,9 @@
       '<div class="sheet-body"><div class="menu">' +
       '<button type="button" class="menu-i" data-m="bench">Compared with: <b>' +
       C.esc(A.ctx && A.ctx.ref ? A.ctx.ref.label : 'Ontario') + '</b></button>' +
+      '<button type="button" class="menu-i" data-m="quiet">Quiet mode: <b>' +
+      (A.isQuiet() ? 'on' : 'off') + '</b><br><span class="menu-sub">no sound, ' +
+      'and nothing offers to read aloud</span></button>' +
       '<button type="button" class="menu-i" data-m="theme">' +
       (dark ? 'Switch to light' : 'Switch to dark') + '</button>' +
       '<button type="button" class="menu-i" data-m="sound">Sound: <b>' +
@@ -843,7 +867,8 @@
       if (!b) return;
       var m = b.getAttribute('data-m');
       closeSheet();
-      if (m === 'bench') A.openBenchmarkPicker();
+      if (m === 'quiet') A.setQuiet(!A.isQuiet());
+      else if (m === 'bench') A.openBenchmarkPicker();
       else if (m === 'theme') toggleTheme();
       else if (m === 'sound') document.getElementById('soundBtn').click();
       else if (m === 'export') root.GRA.exportUI.open(A.ctx);

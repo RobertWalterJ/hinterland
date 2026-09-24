@@ -225,6 +225,11 @@
       var t = total(vec(p.code, 'total')), u = total(vec(p.code, 'usual'));
       if (t > FLOOR && u > FLOOR) (byCD[p.cd] = byCD[p.cd] || []).push(p);
     });
+    /* How many questions any one place may appear in. Audit 2b found seven
+       items with the same stem and the same answer, all of them Pickle Lake:
+       a pairing rule that takes every pair inside a division gives a small
+       division's places a question each time they are paired. */
+    var seen = {};
     Object.keys(byCD).forEach(function (cd) {
       var ps = byCD[cd];
       for (var i = 0; i < ps.length; i++) {
@@ -236,6 +241,9 @@
           var uh = total(vec(hi.code, 'usual')), ul = total(vec(lo.code, 'usual'));
           if (!clear(th, tl) || !clear(uh, ul)) continue;           /* G1, G8 */
           if (!namesOk([optName(hi), optName(lo)])) continue;         /* G9 */
+          if ((seen[hi.code] || 0) >= 4 || (seen[lo.code] || 0) >= 4) continue;
+          seen[hi.code] = (seen[hi.code] || 0) + 1;
+          seen[lo.code] = (seen[lo.code] || 0) + 1;
           var ratio = th / tl;
           out.push(item({
             id: 'A1:' + [a.code, b.code].sort().join('-'),
@@ -405,11 +413,27 @@
 
   /* B3 - the most common occupation among residents, on PUBLISHED intervals. */
   function genOccupation(out) {
-    csds().forEach(function (p) {
+    /* No answer may carry more than a fifth of this form. The commonest work
+       in most Ontario municipalities is sales and service or trades and
+       transport, so 111 of the 123 items this generator used to make had one
+       of those two answers, and "say sales and service" scored nine in ten
+       of them (audit 2b, 24 Sept). The places kept are the ones where the
+       answer is NOT one of the two, first, and then a sample of the rest -
+       which is also the interesting half of Ontario. */
+    var CAP = 25, used = {};
+    var order = csds().slice().sort(function (a, b) {
+      var oa = D.occupationFor(a.code), ob = D.occupationFor(b.code);
+      var ca = oa && oa[0] ? oa[0].short : '', cb = ob && ob[0] ? ob[0].short : '';
+      var ra = /sales|trades/i.test(ca) ? 1 : 0, rb = /sales|trades/i.test(cb) ? 1 : 0;
+      return ra - rb || (a.code < b.code ? -1 : 1);
+    });
+    order.forEach(function (p) {
       var occ = D.occupationFor(p.code);
       if (!occ || occ.length < 3 || !occ[0].n || occ[0].n < 200) return;
       if (!clearCI(occ[0], occ[1])) return;                          /* G1 */
       if (occ[1].n <= FLOOR || occ[2].n <= FLOOR) return;            /* G2 */
+      if ((used[occ[0].short] || 0) >= CAP) return;
+      used[occ[0].short] = (used[occ[0].short] || 0) + 1;
       out.push(item({
         id: 'B3:' + p.code, strand: 'B', form: 'occupation', place: p.code,
         chip: CHIP.live,
@@ -483,7 +507,25 @@
   function genCommute(out, dir) {
     var tf = D.commute && D.commute.top_flows;
     if (!tf) return;
+    /* A mirrored pair is one fact asked twice: "where do most Ajax commuters
+       go" and "where do most people working in Toronto live" can have the
+       same card. 53 such pairs (audit 2b). The OUT item is the one dropped,
+       because out-items outnumbered in-items 154 to 101 and the reader was
+       seeing one direction of travel far more often than the other. */
+    function mirrored(p) {
+      var o = tf[p.code + '|out'], i = tf[p.code], back;
+      if (!o || !o.length) return false;
+      /* the two questions about THIS place have the same answer: most of its
+         commuters go to Ottawa, and most of the people working here live in
+         Ottawa */
+      if (i && i.length && i[0][0] === o[0][0]) return true;
+      /* or the pair is asked from both ends: A's commuters go to B, and B's
+         workers come from A */
+      back = tf[o[0][0]];
+      return !!(back && back.length && back[0][0] === p.code);
+    }
     csds().forEach(function (p) {
+      if (dir === 'out' && mirrored(p)) return;
       var raw = tf[dir === 'out' ? p.code + '|out' : p.code];
       if (!raw) return;
       var flows = raw.filter(function (f) { return f[0] !== p.code && D.byCode[f[0]]; });
@@ -560,7 +602,14 @@
   function genNatural(out) {
     var comp = D.components && D.components.data && D.components.data['2021b'];
     if (!comp) return;
-    Object.keys(comp).forEach(function (cd) {
+    /* More divisions have had more deaths than births for five years running
+       than have not, so the generated pool ran 28 "yes" to 13 "no" and
+       answering yes took more than two thirds of them (audit 2b). The
+       majority answer is capped at a little over the minority, which leaves
+       the cue inside chance without throwing away the finding itself - it is
+       still on the card, and in the Learn tab. */
+    var yes = 0, no = 0, CAP = 18;
+    Object.keys(comp).sort().forEach(function (cd) {
       var rows = D.componentSummary(comp[cd], '2021b');
       if (rows.length < 6) return;
       var last5 = rows.slice(-5);
@@ -569,6 +618,8 @@
       if (!allDown && !allUp) return;          /* mixed years: no clean answer */
       var name = D.geo.cd_names[cd];
       if (!name) return;
+      if (allDown && yes >= CAP) return;
+      if (allDown) yes++; else no++;
       var gap = last5.reduce(function (s, r) { return s + r.natural; }, 0);
       out.push(item({
         id: 'D1:' + cd, strand: 'D', form: 'yesno', cd: cd,
@@ -685,15 +736,28 @@
   function genWhichFirst(out) {
     var H = root.GRA.history;
     if (!H || !H.timeline) return;
-    var tl = H.timeline;
+    /* Pairs close together in time first, and a cap on how often any one
+       event can appear. Every pair of ten events is 45 questions under one
+       stem that says nothing on its own - "Which came first?" - so the
+       reader met the same sentence with the same answer eight times (audit
+       2b). The near pairs are also the ones worth asking: 1989 against 1994
+       is a question, 1965 against 2021 is not. */
+    var tl = H.timeline.slice().sort(function (x, y) { return x.year - y.year; });
+    var asked = {}, wins = {};
     for (var i = 0; i < tl.length; i++) {
       for (var j = i + 1; j < tl.length; j++) {
         var a = tl[i], b = tl[j];
+        if (j - i > 4) continue;             /* near in sequence, not across it */
         if (Math.abs(a.year - b.year) < 4) continue;
         /* 'The Auto Pact' before 'The Auto Pact's exemption ends' is logic,
            not history: a shared word gives the order away */
         if (sharesWord(a.title, b.title)) continue;
         var early = a.year < b.year ? a : b, late = early === a ? b : a;
+        if ((wins[early.title] || 0) >= 2) continue;
+        if ((asked[early.title] || 0) >= 4 || (asked[late.title] || 0) >= 4) continue;
+        wins[early.title] = (wins[early.title] || 0) + 1;
+        asked[early.title] = (asked[early.title] || 0) + 1;
+        asked[late.title] = (asked[late.title] || 0) + 1;
         out.push(item({
           id: 'F1:' + early.year + '-' + late.year + ':' +
             early.title.slice(0, 12) + '/' + late.title.slice(0, 12),
@@ -767,14 +831,158 @@
     }
   }
 
+
+  /* A3 - put three places in order, most jobs to fewest, inside one census
+     division. Audit 3 found half the bank doing one task - a place is named,
+     pick the fact - and no task anywhere that asks for a SEQUENCE by size.
+     The gates are the strictest in the bank because two comparisons have to
+     hold at once: G1 on BOTH adjacent pairs and on BOTH measures (G8), every
+     place above the floor (G2), and no two names confusable (G9). The three
+     options are the same three names in different orders, so the longest
+     option is never the answer. */
+  function genOrderThree(out) {
+    var byCD = {};
+    csds().forEach(function (p) {
+      var t = total(vec(p.code, 'total')), u = total(vec(p.code, 'usual'));
+      if (t > FLOOR && u > FLOOR) (byCD[p.cd] = byCD[p.cd] || []).push(p);
+    });
+    Object.keys(byCD).sort().forEach(function (cd) {
+      var ps = byCD[cd].slice().sort(function (x, y) {
+        return total(vec(y.code, 'total')) - total(vec(x.code, 'total'));
+      });
+      var made = 0, i = 0;
+      /* consecutive triples down the size order, so the three items a
+         division yields are about different places rather than three
+         re-shuffles of its three biggest */
+      while (i + 2 < ps.length && made < 3) {
+        var a = ps[i], b = ps[i + 1], c = ps[i + 2];
+        var ta = total(vec(a.code, 'total')), tb = total(vec(b.code, 'total')),
+            tc = total(vec(c.code, 'total'));
+        var ua = total(vec(a.code, 'usual')), ub = total(vec(b.code, 'usual')),
+            uc = total(vec(c.code, 'usual'));
+        var names = [optName(a), optName(b), optName(c)];
+        if (clear(ta, tb) && clear(tb, tc) &&                       /* G1 */
+            clear(ua, ub) && clear(ub, uc) &&                       /* G8 */
+            namesOk(names)) {                                       /* G9 */
+          var order = function (x, y, z) { return x + ', then ' + y + ', then ' + z; };
+          out.push(item({
+            id: 'A3:' + [a.code, b.code, c.code].join('-'),
+            strand: 'A', form: 'order-three', place: a.code, cd: cd,
+            chip: CHIP.work,
+            stem: 'Which order, from most jobs to fewest?',
+            options: [
+              { label: order(names[0], names[1], names[2]), correct: true },
+              { label: order(names[1], names[0], names[2]), correct: false },
+              { label: order(names[2], names[1], names[0]), correct: false }
+            ],
+            card: {
+              sentence: names[0] + ' has ' + about(ta) + ' jobs, ' + names[1] +
+                ' ' + about(tb) + ', and ' + names[2] + ' ' + about(tc) + '.',
+              /* no chart: a two-place picture shows two of the three places
+                 the question is about, and it put Next 55 px below the fold
+                 on a 375x812 screen (measured, audit 5) */
+              picture: null
+            },
+            prior: 0.5, terms: ['place-of-work']
+          }));
+          made++;
+          i += 3;
+        } else {
+          i += 1;
+        }
+      }
+    });
+  }
+
+  /* B5 - is this place's share of a sector bigger than Ontario's? A location
+     quotient, asked without the words. Two thirds of the bank names a place
+     and asks for a fact about it; this asks the reader to hold a place
+     against the province, which is the comparison the whole tool is built on.
+
+     The first version of this shape asked whether the sector a place is KNOWN
+     for is the one that employs most people there. It was thrown away before
+     it shipped: the answer was in the sector name. Naming farming or mining
+     meant "false" in 24 items out of 24, naming health or manufacturing meant
+     "true" in 28 out of 29, so a reader who knew nothing about Ontario but
+     knew that few people farm could take most of them. The version below is
+     balanced sector by sector - every sector that appears at all appears as
+     often true as false - so the name of the sector carries no information,
+     and one item per place so no place is over-asked. */
+  function genShareVsOntario(out) {
+    var on = vec('35', 'total'), onT = total(on);
+    var bySector = {};
+    csds().forEach(function (p) {
+      var vt = vec(p.code, 'total'), vu = vec(p.code, 'usual');
+      if (!vt || !vu) return;
+      var tt = total(vt), tu = total(vu);
+      if (tt < 500) return;
+      var best = null;
+      vt.forEach(function (x, i) {
+        if (!x || x < 200 || !on[i]) return;
+        /* the gate is on COUNTS, not on the ratio: the place's own count
+           against the count the province's share would predict, separated by
+           the same rule as everywhere else (G1). And it must hold on both
+           measures (G8), so the answer does not turn on who was at work in
+           the reference week. */
+        var e = tt * (on[i] / onT), eu = tu * (on[i] / onT);
+        var over = clear(x, e) && clear(vu[i] || 0, eu);
+        var under = clear(e, x) && clear(eu, vu[i] || 0);
+        if (!over && !under) return;
+        var lift = Math.abs(Math.log((x / tt) / (on[i] / onT)));
+        if (!best || lift > best.lift) {
+          best = { i: i, x: x, e: e, tt: tt, over: over, lift: lift, p: p, vt: vt };
+        }
+      });
+      if (best) (bySector[best.i] = bySector[best.i] || []).push(best);
+    });
+    var picked = [];
+    Object.keys(bySector).forEach(function (k) {
+      var over = [], under = [];
+      bySector[k].slice().sort(function (a, b) { return a.p.code < b.p.code ? -1 : 1; })
+        .forEach(function (r) { (r.over ? over : under).push(r); });
+      /* as many true as false, and never more than six of one sector */
+      var n = Math.min(over.length, under.length, 6);
+      picked = picked.concat(over.slice(0, n), under.slice(0, n));
+    });
+    picked.forEach(function (r) {
+      var name = D.naics[r.i].short;
+      out.push(item({
+        id: 'B5:' + r.p.code, strand: 'B', form: 'share-vs-on', place: r.p.code,
+        chip: CHIP.work,
+        /* asked as a question, not as "True or false: ...". The prefix put
+           the word "false" in the stem and in exactly one option, which is
+           the stem-echo cue the guessability audit watches - an artefact
+           worth none of the 42 items it marked. */
+        /* "share", not "more": the question is about proportion, and a
+           stem that reads as a count would be a different question. Kept
+           inside the twelve-word limit the read-aloud check enforces. */
+        stem: 'Bigger share of ' + optName(r.p) + '’s jobs in ' +
+          name.toLowerCase() + ' than Ontario’s?',
+        options: [{ label: 'True', correct: r.over },
+                  { label: 'False', correct: !r.over }],
+        card: {
+          sentence: name + ' is ' + pct(r.x / r.tt) + ' of the jobs located in ' +
+            optName(r.p) + ', against ' + pct(on[r.i] / onT) + ' across Ontario.',
+          /* no chart: the card states both shares, and the whole sector
+             profile underneath pushed Next below the fold on a phone
+             (measured at 1,046 px against an 812 px screen, audit 5) */
+          picture: null
+        },
+        surprise: r.lift > 1.6 ? 1 : 0, prior: 0.5,
+        terms: ['location-quotient', 'place-of-work']
+      }));
+    });
+  }
+
   /* ---------------------------------------------------------- build */
 
   Q.build = function () {
     init();
     if (Q._bank) return Q._bank;
     var out = [];
-    genBigger(out); genHowMany(out);
+    genBigger(out); genHowMany(out); genOrderThree(out);
     genFingerprint(out); genLargest(out); genOccupation(out); genConcentrated(out);
+    genShareVsOntario(out);
     genCommute(out, 'out'); genCommute(out, 'in'); genTwin(out);
     genNatural(out);
     genWhichMethod(out); genCannot(out); genReadLQ(out);
