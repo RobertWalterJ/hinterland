@@ -89,7 +89,7 @@
 
     /* ------------------------------------------------------- controls */
     var ctl = h('<div class="ctlrow"></div>');
-    ctl.appendChild(h('<span style="font-size:13px;color:var(--ink-3)">If</span>'));
+    ctl.appendChild(h('<span style="font-size:0.8125rem;color:var(--ink-3)">If</span>'));
     var num = h('<input class="search" type="number" min="1" max="100000" ' +
       'step="10" value="' + st.impactJobs + '" ' +
       'style="width:110px;padding:6px 10px" aria-label="Number of jobs">');
@@ -98,7 +98,7 @@
       st.impactJobs = v; A.render();
     });
     ctl.appendChild(num);
-    ctl.appendChild(h('<span style="font-size:13px;color:var(--ink-3)">' +
+    ctl.appendChild(h('<span style="font-size:0.8125rem;color:var(--ink-3)">' +
       'jobs arrived in</span>'));
 
     var sel = h('<select class="sel" aria-label="Industry" ' +

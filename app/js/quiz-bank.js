@@ -127,6 +127,11 @@
   function confusable(a, b) {
     if (lead(a) === lead(b)) return true;
     if (a.slice(0, 5).toLowerCase() === b.slice(0, 5).toLowerCase()) return true;
+    /* one name inside the other: Lincoln / West Lincoln, Hawkesbury / East
+       Hawkesbury. Both were offered in the same question, and a reader who
+       spots the containment can delete one without knowing anything. */
+    var la = a.toLowerCase(), lb = b.toLowerCase();
+    if (la.indexOf(lb) >= 0 || lb.indexOf(la) >= 0) return true;
     return lev(a, b) <= 3;
   }
   /* Words that say what KIND of place something is, or which way it lies,
@@ -153,6 +158,11 @@
        looks ahead */
     if (names.some(function (n) { return !n; })) return false;
     for (var i = 0; i < names.length; i++) {
+      /* an option that contains the stem's name, or is contained by it, is a
+         free answer: "Where do the most BRANT commuters go?" beside
+         "BRANTford" needs no knowledge at all (audit 4, R2b) */
+      var ln = names[i].toLowerCase(), ls = String(stemName || '').toLowerCase();
+      if (stemName && ls && (ln.indexOf(ls) >= 0 || ls.indexOf(ln) >= 0)) return false;
       if (stemName && (lead(names[i]) === lead(stemName) ||
                        sharesWord(names[i], stemName))) return false;
       for (var j = i + 1; j < names.length; j++) {
@@ -642,6 +652,11 @@
                    'is specialised in it', 'is strongly specialised in it'];
       var right = pair[1];
       var wrong = [0, 1, 2, 3].filter(function (i) { return i !== right; });
+      /* bands 2 and 3 are "specialised" and "strongly specialised": the
+         second entails the first, so a reader can rule BOTH out at once.
+         They are never offered together. */
+      if (right === 3) wrong = wrong.filter(function (i) { return i !== 2; });
+      if (right === 2) wrong = wrong.filter(function (i) { return i !== 3; });
       var pick = shuffle(wrong, 'E3' + lq).slice(0, 2);
       out.push(item({
         id: 'E3:' + lq, strand: 'E', form: 'read-number',
@@ -685,8 +700,10 @@
           strand: 'F', form: 'which-first',
           chip: { universe: 'Ontario’s economic history', when: '' },
           stem: 'Which came first?',
-          options: [{ label: early.title, correct: true },
-                    { label: late.title, correct: false }],
+          /* the short label, so the options are of a size with each other:
+             a five-character option beside a fifty-character one is a cue */
+          options: [{ label: early.label || early.title, correct: true },
+                    { label: late.label || late.title, correct: false }],
           card: {
             sentence: early.title + ' came first, in ' + early.year +
               '. ' + late.title + ' followed in ' + late.year + '.',

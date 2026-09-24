@@ -188,7 +188,10 @@ function rule1() {
 function sayList() {
   const m = /var SAY = \[([\s\S]*?)\]\.join/.exec(byName['read.js']);
   if (!m) return null;
-  return (m[1].match(/'([^']+)'/g) || []).map((s) => s.replace(/'/g, ''));
+  /* strip comments first: a /* ... *\/ note inside the array used to swallow
+     half the list and report covered surfaces as missed */
+  const body = m[1].replace(/\/\*[\s\S]*?\*\//g, '');
+  return (body.match(/'([^']+)'/g) || []).map((s) => s.replace(/'/g, ''));
 }
 
 /* Where a class or a tag is rendered, and under what tag. */
@@ -448,12 +451,34 @@ function rule3() {
   say('    rather than hidden with visibility, and the spacer absorbs the width. Check');
   say('    it at 360 px, where the bar is tightest.');
   say('');
-  say('  VERDICT: BREACH - the rule asks for one control and there are two, neither of');
-  say('  which does what the rule asks.');
+  /* Built on 24 Sept. The rule is satisfied when ONE control exists, it is
+     remembered, it silences the sound AND withdraws the read-aloud offer, and
+     the controls leave the layout rather than sitting there dead. Each of
+     those is a separate check, so half a quiet mode still fails. */
+  const app = byName['app.js'] || '';
+  const css = CSS;          /* the stylesheet, read at the top of this file */
+  const readJs = byName['read.js'] || '';
+  const quizJs = byName['quiz-ui.js'] || '';
+  const tests = [
+    ['one control, in the menu', /data-m="quiet"/.test(app)],
+    ['remembered between visits', /hinterland\.quiet/.test(app)],
+    ['turns the sound off too', /sound\.setEnabled\(false\)/.test(app)],
+    ['withdraws read-aloud', /is-quiet/.test(readJs) && /is-quiet/.test(quizJs)],
+    ['controls leave the layout', /body\.is-quiet[^{]*\{[^}]*display:\s*none/.test(css)],
+    ['applied at boot', /classList\.toggle\('is-quiet'/.test(app)]
+  ];
+  say('  Quiet mode, checked part by part:');
+  tests.forEach((t) => say('    ' + pad(t[1] ? 'yes' : 'NO', 5) + t[0]));
+  const quietOk = tests.every((t) => t[1]);
   say('');
-  breaches.push('Rule 3: no quiet mode. A sound toggle and a quiz read setting exist; ' +
-    'nothing turns off sound AND withdraws the read-aloud offer.');
-  return { anyQuiet, soundToggle, quizReadSetting, readButtons };
+  say('  VERDICT: ' + (quietOk ? 'PASS - one control, and it does all of it.'
+    : 'BREACH - see the NO rows above.'));
+  say('');
+  if (!quietOk) {
+    breaches.push('Rule 3: quiet mode is incomplete - ' +
+      tests.filter((t) => !t[1]).map((t) => t[0]).join('; ') + '.');
+  }
+  return { anyQuiet, soundToggle, quizReadSetting, readButtons, quietOk };
 }
 
 /* =================================================== RULE 4: licence credit */
@@ -567,12 +592,36 @@ function rule4() {
   say('    with no licence field would show an empty credit, so add one check to');
   say('    pipeline/validate.py: every source in source_meta has a non-empty licence.');
   say('');
-  say('  VERDICT: BREACH - the credit is generated, the LICENCE is not credited at all.');
+  /* Built on 24 Sept: the licence travels with the source declaration and the
+     clause is generated from the title that was loaded. The rule is satisfied
+     when every payload carries one, the adapted-product clause is present, and
+     the screen prints the generated field rather than a typed string. */
+  const withLicence = meta.sources.filter((x) => x.licence && x.attribution);
+  const missing = meta.sources.filter((x) => !(x.licence && x.attribution));
+  const endorsement = meta.sources.filter((x) =>
+    /does not constitute an endorsement/i.test(x.attribution || ''));
+  const panelsSrc = byName['panels.js'] || '';
+  const printsGenerated = /s\.attribution/.test(panelsSrc);
+  const typedLicence = /Open Licence/.test(panelsSrc);
+  say('  Sources carrying a licence and a credit: ' + withLicence.length +
+      ' of ' + meta.sources.length);
+  say('  Carrying the endorsement clause the licence asks of an adapted product: ' +
+      endorsement.length);
+  say('  The Sources screen prints the generated field: ' + (printsGenerated ? 'yes' : 'NO'));
+  say('  A licence name typed into the app instead: ' + (typedLicence ? 'YES - drift risk' : 'no'));
+  const licenceOk = missing.length === 0 && printsGenerated && !typedLicence &&
+    endorsement.length === meta.sources.length;
   say('');
-  breaches.push('Rule 4: 0 of ' + meta.sources.length + ' sources carry a licence field, ' +
-    'and the word "licence" appears nowhere in the shipped app. Statistics Canada open ' +
-    'data is reproduced and adapted with no licence statement and no endorsement ' +
-    'disclaimer on screen.');
+  say('  VERDICT: ' + (licenceOk
+    ? 'PASS - every payload is credited, and the words come from the build.'
+    : 'BREACH - see above.'));
+  say('');
+  if (!licenceOk) {
+    breaches.push('Rule 4: ' + missing.length + ' of ' + meta.sources.length +
+      ' sources carry no licence' + (printsGenerated ? '' : '; the screen does not print ' +
+      'the generated credit') + (typedLicence ? '; a licence name is typed into the app' : '') +
+      '.');
+  }
   return { present, generatedOnScreen, generatedInExport, shownFields, notShown,
            licenceInApp, licenceInSourcesPy, licenceInReadme, selfDeclared, uncredited };
 }

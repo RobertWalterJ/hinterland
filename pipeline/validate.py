@@ -1118,6 +1118,39 @@ def test_quiz():
               "%d claims over %d items; %d unsupported, %d soft notes" % (
                   a["claimsTotal"], a["itemsChecked"], a["hard"], a["soft"]))
 
+    # Audit 4 (24 Sept): how many questions a reader could answer knowing
+    # nothing. R2 (the stem quoting an option) was 81 items - the size stem
+    # named the losing place, so "never pick the one it names" scored every
+    # one of them. R1/R3 are formatting faults that also hand out marks.
+    r = subprocess.run(["node", os.path.join(HERE, "audits", "guessability.js"), "--json"],
+                       capture_output=True, text=True)
+    if not r.stdout.strip():
+        check("no question can be answered without knowing anything", False, r.stderr[:300])
+    else:
+        g = json.loads(r.stdout)
+        # R2b is measured but not gated: the audit found the echoed option is
+        # the key 1 time in 2, which is chance, so failing on it would delete
+        # honest items to fix nothing. It is reported so a regression shows.
+        gate = [x for x in g["rules"] if x["id"] in ("R1", "R2", "R3", "R4", "R5")]
+        bad = [x for x in gate if x["fails"]]
+        check("no question hands out its answer: stem quotes, lone long options, "
+              "options that overlap, position bias",
+              not bad,
+              "; ".join("%s %d" % (x["id"], x["fails"]) for x in gate) +
+              "; watched: R2b %d; a know-nothing player answers %d with certainty" % (
+                  [x for x in g["rules"] if x["id"] == "R2b"][0]["fails"],
+                  g["exploitable"]))
+
+    # Audit 8 (24 Sept): the standing rules - no timers, read-aloud reaches the
+    # app's own prose, a quiet mode, and a licence credit generated from what
+    # was actually loaded.
+    r = subprocess.run(["node", os.path.join(HERE, "audits", "rules.js")],
+                       capture_output=True, text=True)
+    check("the standing rules hold: no timers, read-aloud everywhere, quiet "
+          "mode, generated licence credit",
+          r.returncode == 0,
+          " ".join((r.stdout or r.stderr)[-300:].split()) if r.returncode else "")
+
     # 120 days, not 90: audit 2 (24 Sept) put a three-day minimum gap between
     # sightings, and a big idea then takes longer than a quarter to reach
     # "held". At 90 days the study said 7 of 9 ideas and read like a fault; at

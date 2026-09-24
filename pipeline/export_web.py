@@ -33,6 +33,12 @@ IDX = dict((c, i) for i, c in enumerate(NAICS_CODES))
 YEARS = [2001, 2006, 2011, 2016, 2021]
 
 
+import sources as SRC              # noqa: E402  (licence text travels here)
+from sources import SOURCES        # noqa: E402
+
+SOURCE_BY_KEY = {s.key: s for s in SOURCES}
+
+
 def write(name, obj):
     path = os.path.join(OUT, name)
     with open(path, "w", encoding="utf-8") as f:
@@ -300,7 +306,23 @@ def main():
     sources = []
     for r in con.execute("""SELECT key,title,url,purpose,caveats,vintage,cite,
                built_at,rows_loaded FROM source_meta ORDER BY key"""):
-        sources.append(dict(r))
+        d = dict(r)
+        # the licence travels with the source declaration, so the credit on
+        # screen is generated from what was actually loaded (audit 8)
+        src = SOURCE_BY_KEY.get(d["key"])
+        if src is not None:
+            d["licence"] = src.licence
+            d["licence_url"] = src.licence_url
+            d["attribution"] = src.attribution
+        elif (d.get("title") or "").startswith("Statistics Canada"):
+            # the five-census series is declared as a tuple rather than a
+            # Source (sources.LEGACY_SERIES); it carries the same licence, and
+            # the clause is still generated from the title that was loaded
+            d["licence"] = SRC.STATCAN_LICENCE
+            d["licence_url"] = SRC.STATCAN_LICENCE_URL
+            d["attribution"] = SRC.statcan_attribution(
+                d["title"].replace("Statistics Canada. ", "").rstrip("."))
+        sources.append(d)
 
     coverage = {}
     for year in YEARS:

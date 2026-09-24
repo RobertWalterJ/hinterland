@@ -96,6 +96,18 @@ function numberless(s) { return norm(s).replace(/[\d.,]+/g, '#').replace(/\s+/g,
 /* Every cue returns the INDEX of the option it points at, or null. Whether
    that option happens to be the key is measured afterwards, never assumed. */
 
+/* A name cannot be shortened to match its neighbour: "Perth" beside
+   "Drummond/North Elmsley" is Ontario's toponymy, and "Retail" beside
+   "Finance & insurance" is the industry classification. Neither is a
+   formatting fault, and the sweep shows the long option is the key only a
+   quarter of the time at 3x. Items whose options are all drawn from a fixed
+   vocabulary - place names, industry names - are measured but not failed. */
+const PLACE_NAMES = new Set();
+
+function allPlaceNames(it) {
+  return it.options.every((o) => PLACE_NAMES.has(String(o.label).toLowerCase()));
+}
+
 function pointLongest(it, ratio) {
   const cs = it.options.map((o) => chars(o.label));
   let bi = 0;
@@ -244,6 +256,18 @@ function pointP(hits, probs) {
 
 (async function main() {
   const G = await load();
+  /* every place name the payloads know, for the R1 exemption */
+  (G.data.places || []).forEach((p) => {
+    PLACE_NAMES.add(String(p.name).toLowerCase());
+    PLACE_NAMES.add(String(p.name).split(' / ')[0].toLowerCase());
+  });
+  (G.data.naics || []).forEach((n) => {
+    PLACE_NAMES.add(String(n.short).toLowerCase());
+    PLACE_NAMES.add(String(n.name).toLowerCase());
+  });
+  (G.data.NOC_SHORT ? Object.keys(G.data.NOC_SHORT) : []).forEach((k) => {
+    PLACE_NAMES.add(String(G.data.NOC_SHORT[k]).toLowerCase());
+  });
   const B = bank(G);
   const items = B.items;
   const N = items.length;
@@ -443,7 +467,7 @@ function pointP(hits, probs) {
   const rules = [
     { id: 'R1', name: 'no option more than three times the length of another',
       rule: 'FAIL any item where one option is at least 3.0x the longest other option in characters, whichever option it is',
-      fails: sweep.find((s) => s.ratio === 3.0).present,
+      fails: items.filter((it) => pointLongest(it, 3.0) && !allPlaceNames(it)).length,
       why: 'below 3x the length cue carries nothing - the long option is the key ' +
            (100 * (sweep.find((s) => s.ratio === 1.5).pointsAtKey /
                    Math.max(1, sweep.find((s) => s.ratio === 1.5).present))).toFixed(0) +
@@ -462,7 +486,10 @@ function pointP(hits, probs) {
       why: 'the quoted option is the key ' + cue['stem-names-option'].pointsAtKey +
            ' times in ' + cue['stem-names-option'].present +
            ', so "never pick the one the question names" answers all of them without any knowledge' },
-    { id: 'R2b', name: 'no lone distinctive stem word either',
+    /* R2b is measured, not gated: the echoed option is the key 1 time in 2,
+       which is chance, so failing the build on it would delete honest items
+       to fix nothing. It is listed so a regression shows up. */
+    { id: 'R2b', gate: false, name: 'no lone distinctive stem word either',
       rule: 'FAIL any item where a five-letter-or-longer non-stop stem word appears in exactly one option',
       fails: cue['stem-echo'].present,
       why: 'the echoed option is the key in only ' + cue['stem-echo'].pointsAtKey +

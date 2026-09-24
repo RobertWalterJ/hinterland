@@ -14,13 +14,30 @@ STATCAN_GEO = ("https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/
                "boundary-limites/files-fichiers/{f}")
 
 
+# Every payload the app ships carries its licence and the words that licence
+# asks for. They travel with the source rather than being typed into a screen,
+# so the credit cannot drift from what is actually loaded (audit 8, 24 Sept).
+STATCAN_LICENCE = "Statistics Canada Open Licence"
+STATCAN_LICENCE_URL = "https://www.statcan.gc.ca/en/reference/licence"
+
+
+def statcan_attribution(title):
+    """The clause the Open Licence requires of an adapted product."""
+    return ("Adapted from Statistics Canada, %s. This does not constitute an "
+            "endorsement by Statistics Canada of this product." % title)
+
+
 class Source:
     def __init__(self, key, title, url, purpose, caveats, vintage, filename,
-                 pid=None, cite=None):
+                 pid=None, cite=None, licence=None, licence_url=None,
+                 attribution=None):
         self.key, self.title, self.url = key, title, url
         self.purpose, self.caveats = purpose, caveats
         self.vintage, self.filename = vintage, filename
         self.pid, self.cite = pid, cite
+        self.licence = licence or STATCAN_LICENCE
+        self.licence_url = licence_url or STATCAN_LICENCE_URL
+        self.attribution = attribution or statcan_attribution(title)
 
     def __repr__(self):
         return "<Source %s>" % self.key
@@ -41,6 +58,7 @@ def statcan(key, pid, title, purpose, caveats, vintage):
         filename="%s_%s.zip" % (key, pid),
         cite=("Statistics Canada. Table %s. "
               "https://doi.org/10.25318/%s-eng" % (tag, tag)),
+        attribution=statcan_attribution("table %s - %s" % (tag, title)),
     )
 
 
