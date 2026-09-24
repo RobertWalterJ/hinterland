@@ -172,7 +172,11 @@ function simulate(bank, seed, days) {
 (async function main() {
   await G.data.load();
   const bank = G.quizBank.build();
-  const days = 90;
+  /* 90 days by default; --days N for a longer study (the app is meant to be
+     used over a year, and the wider spacing of 24 Sept means a big idea takes
+     longer to reach "held") */
+  const dayArg = process.argv.find((a) => a.startsWith('--days='));
+  const days = dayArg ? +dayArg.split('=')[1] : 90;
   const runs = [11, 23, 47, 59, 71, 83, 97].map((seed) => ({ seed, ...simulate(bank, seed, days) }));
   const again = simulate(bank, 11, days);
   const deterministic = JSON.stringify(again.trace) === JSON.stringify(runs[0].trace);

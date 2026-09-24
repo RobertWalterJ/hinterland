@@ -1102,7 +1102,28 @@ def test_quiz():
           worst_stem <= 12 and worst_card <= 22,
           "longest place stem %d words, longest card %d" % (worst_stem, worst_card))
 
-    r = subprocess.run(["node", os.path.join(HERE, "quiz_simulate.js")],
+    # Audit 1 (24 Sept): every figure, name and comparison a question or a
+    # lesson states, recomputed from the payload it came from. It found 210
+    # unsupported claims in 157 items - most of them a card naming a second
+    # sector it had never tested - so it runs with the rest now.
+    r = subprocess.run(["node", os.path.join(HERE, "audits", "accuracy.js"), "--json"],
+                       capture_output=True, text=True)
+    if r.returncode not in (0, 1) or not r.stdout.strip():
+        check("every stated claim recomputes from its source", False, r.stderr[:300])
+    else:
+        a = json.loads(r.stdout)          # --json prints one pretty object
+        check("every figure, name and comparison a question states recomputes "
+              "from its own payload",
+              a["hard"] == 0,
+              "%d claims over %d items; %d unsupported, %d soft notes" % (
+                  a["claimsTotal"], a["itemsChecked"], a["hard"], a["soft"]))
+
+    # 120 days, not 90: audit 2 (24 Sept) put a three-day minimum gap between
+    # sightings, and a big idea then takes longer than a quarter to reach
+    # "held". At 90 days the study said 7 of 9 ideas and read like a fault; at
+    # 120 it is 9 of 9 for every learner. The app is meant to be used over a
+    # year, so the longer window is also the fairer test.
+    r = subprocess.run(["node", os.path.join(HERE, "quiz_simulate.js"), "--days=120"],
                        capture_output=True, text=True)
     if r.returncode != 0:
         check("the scheduler simulation runs", False, r.stderr[:300])

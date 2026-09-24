@@ -353,11 +353,16 @@
       }
       pts.push('Across much of Ontario, deaths now outnumber births, so growth depends ' +
         'on people moving in.');
-      pts.push('Trade deals, the auto industry and new municipal boundaries shaped the ' +
-        'economy the numbers show.');
+      /* history.js keeps the sourced arc and the data juxtaposed, never
+         joined by "because". "Shaped" was a cause. */
+      pts.push('Trade deals, the auto industry and new municipal boundaries run ' +
+        'alongside these numbers. The timeline dates them; it does not explain them.');
     } else if (id === 'methods') {
+      /* terms.js and METHODS 2.4 both say shift-share does NOT say why: it is
+         an accounting split. The lesson may not claim more than the method. */
       pts.push('Every number here comes from a method with a name. A <b>location ' +
-        'quotient</b> says how concentrated work is; <b>shift-share</b> says why jobs grew.');
+        'quotient</b> says how concentrated work is; <b>shift-share</b> splits a ' +
+        'change in jobs into three parts.');
       pts.push('Every census count has some uncertainty. A small difference may be noise, ' +
         'so the tool only calls a difference when it is clearly bigger than that.');
     }
@@ -716,10 +721,20 @@
         if (!hi || !lo || !hi.pop2021 || !lo.pop2021) return false;
         if (lo.pop2021 < 1.2 * hi.pop2021) return false;
         it.idea = 'links'; it.level = 3;
-        it.stem = H.optName(lo) + ' has more people. Which has more jobs?';
-        it.card.sentence = H.optName(hi) + ': ' + H.about(H.total(H.vec(hi.code, 'total'))) +
-          ' jobs, against ' + H.about(H.total(H.vec(lo.code, 'total'))) +
-          '. People travel in to work.';
+        /* The stem must not name an option. Naming the place with more PEOPLE
+           made the other option right every time: 81 of 81, so a reader who
+           knew nothing scored every one of them (audit 4, 24 Sept). The
+           surprise moves to the card, where it teaches instead of telling. */
+        it.stem = 'Which of these two has more jobs?';
+        /* The closing clause is a comparison, so it is gated like the rest:
+           said only where jobs clearly outnumber working residents. Two items
+           had it the wrong way round - the winner sent more workers out than
+           it drew in. */
+        var inflow = H.clear(hi.jobs, hi.residentWorkersFixed);
+        it.card.sentence = H.optName(lo) + ' has more people, yet ' + H.optName(hi) +
+          ' has more jobs: ' + H.about(H.total(H.vec(hi.code, 'total'))) + ' against ' +
+          H.about(H.total(H.vec(lo.code, 'total'))) +
+          (inflow ? '. People travel in to work.' : '.');
         it.surprise = 1;
         return true;
       }

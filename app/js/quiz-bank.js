@@ -325,12 +325,20 @@
     });
   }
 
+  /* G1 applies to everything the screen states, not only to the answer
+     (QUIZ-DESIGN principle 2). A second sector is named only where it clearly
+     beats the THIRD - otherwise it is not the second - and the two are put in
+     order only where the first clearly beats the second. Where either test
+     fails the card names the largest group and stops: still true, and shorter
+     to read. The accuracy audit found this stating 202 ungated ranks, one of
+     them between two sectors tied at 520 workers. */
   function topWords(v) {
     var t = total(v);
     var r = v.map(function (x, i) { return { i: i, x: x || 0 }; })
-      .sort(function (a, b) { return b.x - a.x; }).slice(0, 2);
-    return 'led by ' + D.naics[r[0].i].short.toLowerCase() + ' (' +
-      pct(r[0].x / t) + ') and ' + D.naics[r[1].i].short.toLowerCase() +
+      .sort(function (a, b) { return b.x - a.x; });
+    var one = D.naics[r[0].i].short.toLowerCase() + ' (' + pct(r[0].x / t) + ')';
+    if (!clear(r[0].x, r[1].x) || !clear(r[1].x, r[2].x)) return 'led by ' + one;
+    return 'led by ' + one + ' and ' + D.naics[r[1].i].short.toLowerCase() +
       ' (' + pct(r[1].x / t) + ')';
   }
 
@@ -510,6 +518,11 @@
         return { q: q, d: M.mixDistance(v, vec(q.code, 'total')) };
       }).filter(function (x) { return x.d != null; }).sort(function (a, b) { return a.d - b.d; });
       if (d.length < 10 || d[0].d > 0.12 || d[0].d > 0.8 * d[1].d) return;
+      /* "of a similar size" has to mean something: the pool was every place
+         with 2,000 jobs, so a 67,000-job city was called the same size as a
+         16,500-job one. Within a factor of two, or the item is not asked. */
+      var tw = total(vec(d[0].q.code, 'total')), tp = total(v);
+      if (!tw || Math.max(tw, tp) / Math.min(tw, tp) > 2) return;
       var far = d[Math.floor(d.length / 2)].q;           /* a clearly different one */
       var names = [optName(d[0].q), optName(d[1].q), optName(far)];
       if (!namesOk(names, optName(p))) return;
@@ -520,7 +533,7 @@
         options: names.map(function (n, i) { return { label: n, correct: i === 0 }; }),
         card: {
           sentence: names[0] + ' has the most similar mix of jobs to ' +
-            optName(p) + ' of any place its size in Ontario.',
+            optName(p) + ' of any place of a similar size in Ontario.',
           picture: { kind: 'pair', a: p.code, b: d[0].q.code }
         },
         prior: 0.7, terms: ['mix-distance']

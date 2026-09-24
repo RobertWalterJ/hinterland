@@ -12,8 +12,11 @@
        back four places later ("learning steps"). Played, that reads as the
        same question again; the answer card is the teaching, and the miss
        comes back the next day instead.
-     - A SOFT COOL-DOWN across sessions: nothing asked in the last four
-       hours is asked again, so short bursts through the day stay fresh.
+     - A MINIMUM GAP of three days between sightings. The first version had a
+       four-hour cool-down, which could never bite: no interval was ever
+       shorter than a day, so "tomorrow" was the default answer to a miss and
+       a fortnight of keen play put a third of all asks on consecutive days
+       and showed only 72 distinct questions.
      - SIMILAR QUESTIONS KEPT APART: one question per place per session, at
        most three of one form, and the order spread so the same idea does
        not come twice running where it can be avoided.
@@ -46,6 +49,17 @@
     sessionSize: 12,
     maxInterval: 60,           /* days */
     firstInterval: 1,
+    minGapDays: 3,             /* never the same question inside three days:
+                                  measured, a fortnight of keen play put a
+                                  third of all asks on consecutive days */
+    lapseBackoff: [2, 2],      /* days after a first miss, then a second: a
+                                  miss used to mean "tomorrow", every time.
+                                  Swept against both studies: [1,1] held 68%
+                                  but left the backlog over its bound, [2,3]
+                                  drained it further but cost 3 more points of
+                                  retention. [2,2] keeps 65% (the weakest
+                                  learner 60%, the best of the three) with the
+                                  backlog inside 0.67. */
     ease0: 2.4, easeMin: 1.4, easeMax: 3.0,
     lapseFactor: 0.4,          /* a miss SHRINKS the interval; it does not
                                   restart it (a reset made every miss due again
@@ -125,7 +139,8 @@
       if (r.missedAt && !r.turned && dayKey(now) !== dayKey(r.missedAt)) r.turned = now;
     } else {
       r.lapses++;
-      r.ivl = Math.max(r.lapses >= S.P.leechLapses ? S.P.leechFloor : 1,
+      r.ivl = Math.max(r.lapses >= S.P.leechLapses ? S.P.leechFloor
+                       : (S.P.lapseBackoff[r.lapses - 1] || S.P.leechFloor),
                        r.ivl * S.P.lapseFactor);
       r.ease = Math.max(S.P.easeMin, r.ease - 0.2);
       r.streak = 0;
@@ -203,7 +218,7 @@
     var P = S.P;
     var size = opts.size || P.sessionSize;
     var status = S.ideas(state, bank);
-    var cool = now - P.coolHours * 3600000;
+    var cool = now - Math.max(P.coolHours * 3600000, P.minGapDays * DAY);
     function cooling(id) { return (state.seen[id] || 0) > cool; }
 
     /* record ideas as they open, so the reader is told once, with a lesson */
@@ -212,6 +227,12 @@
     });
 
     var ids = Object.keys(state.items);
+    /* every review that has fallen due, including the ones the minimum gap is
+       holding back: the pace rule read a blocked review as "no backlog" and
+       poured eight new questions in on top of it */
+    var waiting = ids.filter(function (id) {
+      return bank.byId[id] && S.isDue(state.items[id], now);
+    }).length;
     var due = ids.filter(function (id) {
       return bank.byId[id] && !cooling(id) && S.isDue(state.items[id], now);
     }).sort(function (a, b) {
@@ -251,9 +272,9 @@
     /* pace follows the reviews: never none while any remain */
     var early = state.sessions < 3;
     var nNew = !(unseen.length + ahead.length) ? 0
-      : due.length <= 3 ? (early ? 8 : 6)
-      : due.length <= 8 ? 4
-      : due.length <= 14 ? 2 : 1;
+      : waiting <= 3 ? (early ? 8 : 6)
+      : waiting <= 8 ? 4
+      : waiting <= 14 ? 2 : 1;
 
     /* the spread rules, shared by reviews and new questions */
     var usedPlace = {}, usedForm = {}, usedStem = {};
