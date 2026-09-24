@@ -1506,6 +1506,139 @@ function fmt(x) {
     }
   }
 
+  /* ============================================ the stories
+
+     The sentences the answer screen tells about a place (app/js/quiz-story.js)
+     are generated when the card is drawn, not baked into an item, so nothing
+     above touches them. They are the most quotable thing in the app - "that
+     is the shape of a hospital town" - and so the ones most worth checking.
+
+     Every municipality's story is regenerated here and every figure in it
+     recomputed from the payloads, with the separation the sentence implies
+     re-tested. A reading ("the shape of a hospital town") is checked for the
+     two conditions it claims: a concentration, and more jobs than working
+     residents. */
+
+  const ST = G.quizStory;
+  let storyPlaces = 0, storySentences = 0;
+  if (ST) {
+    for (const p of (D.byLevel.CSD || [])) {
+      const story = ST.forPlace(p.code);
+      if (!story.length) continue;
+      storyPlaces++;
+      const sid = 'story:' + p.code;
+      const where = srcLine('quiz-story.js', 'READING');
+      const vt = W(p.code), vu = W(p.code, 'usual');
+      const tt = sum(vt), tu = sum(vu);
+      let sectorIdx = null;
+      for (const line of story) {
+        storySentences++;
+        itemsChecked++;
+        let m;
+        if (line.kind === 'pull' || line.kind === 'push') {
+          m = line.text.match(/^(.+?) has (?:about )?([\d,]+) (jobs|working residents) and (?:about )?([\d,]+) (jobs|working residents)\./);
+          if (!m) {
+            hard('P', 'number', sid, 'work sentence', line.text, '(unparsed)', where);
+            continue;
+          }
+          const bigger = m[3] === 'jobs' ? p.jobs : p.residentWorkersFixed;
+          const smaller = m[5] === 'jobs' ? p.jobs : p.residentWorkersFixed;
+          num('HARD', sid, m[3], m[2], bigger, 'about', CELLS, where);
+          num('HARD', sid, m[5], m[4], smaller, 'about', CELLS, where);
+          counted.comparison++;
+          if (!clear(bigger, smaller)) {
+            hard('C', 'comparison', sid, 'the side it says is larger',
+                 bigger + ' vs ' + smaller, 'not separated at z=3', where);
+          }
+          counted.comparison++;
+          const claimsPull = line.kind === 'pull';
+          if (claimsPull !== (p.jobs > p.residentWorkersFixed)) {
+            hard('C', 'comparison', sid, 'which way the travel goes',
+                 line.kind, p.jobs > p.residentWorkersFixed ? 'pull' : 'push', where);
+          }
+        } else if (line.kind === 'sector') {
+          m = line.text.match(/^(.+?) is (\d+)% of the work here, against (\d+)% across Ontario\.$/);
+          if (!m) {
+            hard('P', 'number', sid, 'sector sentence', line.text, '(unparsed)', where);
+            continue;
+          }
+          name(sid, 'sector named', m[1], sectorNames, 'the NAICS labels', where);
+          const k = D.naics.map((x, i) => i).filter(
+            (i) => D.naics[i].short === m[1])[0];
+          if (k == null) continue;
+          sectorIdx = k;
+          num('HARD', sid, 'share here', m[2], 100 * vt[k] / tt, 'print', CELLS, where);
+          num('HARD', sid, 'share in Ontario', m[3], 100 * ONT[k] / ONT_T,
+              'print', CELLS, where);
+          counted.comparison += 2;
+          const e = tt * (ONT[k] / ONT_T), eu = tu * (ONT[k] / ONT_T);
+          if (!clear(vt[k], e) || !clear(vu[k] || 0, eu)) {
+            hard('C', 'comparison', sid, 'concentration separated from Ontario',
+                 vt[k] + ' vs ' + Math.round(e) + ' expected',
+                 'not separated at z=3 on both measures', where);
+          }
+          if ((vt[k] / tt) / (ONT[k] / ONT_T) < 1.5) {
+            hard('C', 'comparison', sid, 'concentration worth a sentence',
+                 'lift ' + fmt((vt[k] / tt) / (ONT[k] / ONT_T)), 'under 1.5', where);
+          }
+        } else if (line.kind === 'reading') {
+          /* "That is the shape of a hospital town" - a reading of a pattern,
+             and it claims exactly two things about the numbers. */
+          counted.method += 2;
+          if (!(p.jobs > p.residentWorkersFixed) ||
+              !clear(p.jobs, p.residentWorkersFixed)) {
+            hard('D', 'method', sid, 'a reading needs workers travelling IN',
+                 line.text, p.jobs + ' jobs vs ' + p.residentWorkersFixed +
+                 ' working residents', where);
+          }
+          if (sectorIdx == null) {
+            hard('D', 'method', sid, 'a reading needs the concentration it reads',
+                 line.text, 'no sector sentence earned', where);
+          }
+        } else if (line.kind === 'people') {
+          m = line.text.match(/^Across (.+?), deaths have outnumbered births every year since (\d{4}), and (?:about )?([\d,]+) more people a year arrive than leave/);
+          if (!m) {
+            hard('P', 'number', sid, 'people sentence', line.text, '(unparsed)', where);
+            continue;
+          }
+          counted.name++;
+          if (D.geo.cd_names[p.cd] !== m[1]) {
+            hard('B', 'name', sid, 'census division named', m[1],
+                 D.geo.cd_names[p.cd] || p.cd, where);
+          }
+          const comp = D.componentsFor({ level: 'CD', code: p.cd });
+          const rows = D.componentSummary(comp.series['2021b'], '2021b');
+          let i = rows.length - 1;
+          while (i >= 0 && rows[i].natural < -50) i--;
+          const run = rows.slice(i + 1);
+          counted.date++;
+          if (String(run[0].year) !== m[2]) {
+            hard('E', 'date', sid, 'the year the run of deaths starts', m[2],
+                 String(run[0].year), where);
+          }
+          counted.comparison += run.length;
+          for (const r of run) {
+            if (!(r.natural < 0)) {
+              hard('C', 'comparison', sid, 'every year in the run',
+                   r.year + ': ' + r.natural, 'not a year of more deaths', where);
+            }
+          }
+          const last5 = run.slice(-5);
+          const moved = last5.reduce((t, r) => t + (r.intraprovincial || 0) +
+            (r.interprovincial || 0) + (r.international || 0), 0) / last5.length;
+          num('HARD', sid, 'people arriving a year', m[3], moved, 'about', 0, where);
+          if (/has grown anyway/.test(line.text)) {
+            counted.comparison++;
+            if (!(p.pop2025 > p.pop2021est)) {
+              hard('C', 'comparison', sid, '"has grown anyway"',
+                   p.pop2021est + ' to ' + p.pop2025, 'not a rise', where);
+            }
+          }
+        }
+      }
+    }
+  }
+
   /* ===================================================== report */
   report();
 

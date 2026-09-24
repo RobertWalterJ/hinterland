@@ -30,13 +30,13 @@
   'use strict';
 
   var QU = {};
-  var D, C, M, T, A, U, S, B, R, I;
+  var D, C, M, T, A, U, S, B, R, I, QM, QS;
 
   function init() {
     D = root.GRA.data; C = root.GRA.charts; M = root.GRA.methods;
     T = root.GRA.terms; A = root.GRA.app; U = root.GRA.ui;
     S = root.GRA.quizSched; B = root.GRA.quizBank; R = root.GRA.read;
-    I = root.GRA.quizIdeas;
+    I = root.GRA.quizIdeas; QM = root.GRA.quizMap; QS = root.GRA.quizStory;
   }
   function esc(s) { return C.esc(s == null ? '' : String(s)); }
 
@@ -47,7 +47,7 @@
 
   var SET_KEY = 'hinterland.quiz.settings';
   function settings() {
-    var d = { read: true, homeER: '' };
+    var d = { read: true, homeER: '', optSpk: false };
     try {
       var raw = root.localStorage && root.localStorage.getItem(SET_KEY);
       if (raw) {
@@ -249,14 +249,30 @@
       if (!comp || !comp.series['2021b']) return '';
       var yrs = D.componentSummary(comp.series['2021b'], '2021b').slice(-5);
       var mx = Math.max.apply(null, yrs.map(function (y) { return Math.abs(y.natural); })) || 1;
-      return '<div class="qpic"><div class="qnat">' + yrs.map(function (y) {
-        var up = y.natural >= 0;
-        return '<div class="qnat-col"><span class="qnat-v">' +
-          (up ? '+' : '−') + C.fmt(Math.abs(Math.round(y.natural))) +
-          '</span><span class="qnat-bar ' + (up ? 'is-up' : 'is-down') +
-          '" style="height:' + Math.max(4, 44 * Math.abs(y.natural) / mx) +
-          'px"></span><span class="qnat-y">' + y.year + '</span></div>';
-      }).join('') + '</div><p class="qpic-note">Births minus deaths, each year.</p></div>';
+      /* Bars hang from a zero line. They used to be drawn as hollow outlined
+         boxes standing on the floor of the chart whenever the number was
+         negative, which is what five years of more deaths than births always
+         is: five empty rectangles, above nothing, reading as a bar chart of
+         positive numbers. The generator only ever makes this picture when
+         every year runs the same way, so one zero line and one direction is
+         the whole case. */
+      var down = yrs[0].natural < 0;
+      var say = 'Births minus deaths. ' + yrs.map(function (y) {
+        return y.year + ', ' + (y.natural < 0 ? 'minus ' : 'plus ') +
+          C.fmt(Math.abs(Math.round(y.natural)));
+      }).join('. ') + '.';
+      return '<div class="qpic"><div class="qnat' + (down ? ' is-down' : '') +
+        '" data-say="' + esc(say) + '"><div class="qnat-bars">' +
+        yrs.map(function (y) {
+          return '<span class="qnat-col"><i class="qnat-bar" style="height:' +
+            Math.max(3, 46 * Math.abs(y.natural) / mx) + 'px"></i></span>';
+        }).join('') + '</div><div class="qnat-labels">' +
+        yrs.map(function (y) {
+          return '<span class="qnat-col"><b class="qnat-v">' +
+            (y.natural >= 0 ? '+' : '−') + C.fmt(Math.abs(Math.round(y.natural))) +
+            '</b><span class="qnat-y">' + y.year + '</span></span>';
+        }).join('') + '</div></div>' +
+        '<p class="qpic-note">Births minus deaths, each year.</p></div>';
     }
     return '';
   }
@@ -335,18 +351,26 @@
       '<div class="qline"><h2 class="qstem">' + esc(it.stem) + '</h2>' +
       (asking ? speaker('the question') : '') + '</div>' +
       (run.phase === 'ask' && it.prompt ? picture(it.prompt, true) : '') +
+      (asking ? mapSlot(it, 'ask') : '') +
       '</div>';
 
     if (run.phase === 'ask') {
+      /* One speaker, on the question, which reads the stem and then every
+         option in turn. A speaker under each option as well cost three 44px
+         circles on a three-option question - most of a phone screen given to
+         controls - and read out exactly the same words. A reader who wants
+         them back has the switch in Settings. */
+      var perOpt = settings().optSpk;
       var opts = '<div class="qopts">' + it.options.map(function (o, i) {
         return '<div class="qline"><button type="button" class="qopt" data-i="' + i +
           '" data-say="' + esc(o.say) + '"><span class="qkey" aria-hidden="true">' + o.key +
           '</span><span class="qlabel">' + esc(o.label) + '</span></button>' +
-          speaker('option ' + o.key) + '</div>';
+          (perOpt ? speaker('option ' + o.key) : '') + '</div>';
       }).join('') + '</div>';
       wrap.innerHTML = topBar() + ask + opts;
       host.appendChild(wrap);
       wireAsk(wrap, it);
+      fillMap(wrap, it, 'ask');
       wireSpeakers(wrap);
       autoRead(wrap.querySelector('.qask').parentNode);
       return;
@@ -371,7 +395,21 @@
 
     var verdict = right ? 'Right: ' + correct.label + '.'
       : 'You chose ' + opt.label + '. The answer is ' + correct.label + '.';
+    /* The story behind the number (quiz-story.js). One sentence goes on the
+       card, because Robert asked for the app to say WHY a place looks the way
+       it does - Brockville's hospital and its catchment are both in the
+       payloads and neither was ever on screen. The rest sits under "More",
+       with the map, so the card does not grow past the fold again. */
+    var story = (QS && it.place) ? QS.forPlace(it.place) : [];
+    var lead = story.length && QS ? QS.lead(it.place, it.card.sentence) : null;
+    var rest = lead ? story.filter(function (x) {
+      return lead.text.indexOf(x.text) < 0;
+    }) : [];
     var moreBits = (it.card.more ? '<p class="qmore-p">' + esc(it.card.more) + '</p>' : '') +
+      (rest.length ? '<div class="qstory-more">' + rest.map(function (x) {
+        return '<p class="qstory-p">' + esc(x.text) + '</p>';
+      }).join('') + '</div>' : '') +
+      mapSlot(it, 'card') +
       (it.idea && I ? '<p class="qpart">Part of the big idea <b>' +
         esc(I.byId[it.idea].title) + '</b></p>' : '') +
       '<div class="qterms"></div>' +
@@ -389,6 +427,7 @@
       '<span class="qvicon" aria-hidden="true">' + (right ? '✓' : '✕') + '</span>' +
       '<span>' + esc(verdict) + '</span></p>' + speaker('the answer') + '</div>' +
       '<p class="qsentence">' + esc(it.card.sentence) + '</p>' +
+      (lead ? '<p class="qstory">' + esc(lead.text) + '</p>' : '') +
       picture(it.card.picture, false) +
       conf +
       '<button type="button" class="linkbtn qmisread">That was a misread: ask me again</button>' +
@@ -403,9 +442,102 @@
     wrap.innerHTML = topBar() + ask + marked + card;
     host.appendChild(wrap);
     wireCard(wrap, it);
+    fillMap(wrap, it, 'card');
     wireSpeakers(wrap);
     autoRead(wrap.querySelector('.qcard'));
   };
+
+
+  /* ------------------------------------------------------------ the map
+
+     Robert, who has worked as a planner across this province, could not place
+     Dysart et al, Cramahe or North Kawartha - and the question asked him which
+     was a factory town. A question about a place the reader cannot find is a
+     vocabulary test, so every question that names one now carries a small map
+     and a sentence saying where it is.
+
+     WHICH PLACES MAY BE DRAWN. On the question screen, only the place the STEM
+     names. Drawing the options as well would answer "where do the most X
+     commuters go?" outright, because the nearest big dot usually is the
+     answer - and the guessability audit would never catch it, since it reads
+     text and not pictures. Where the stem names nobody and the OPTIONS are the
+     places, all of them are drawn: that is Robert's case, and knowing where
+     three towns sit is reasoning rather than leakage. The answer screen draws
+     everything, including the journey on a commuting question. */
+
+  var optIndex = null;
+  function codeOf(label) {
+    if (!optIndex) {
+      optIndex = {};
+      var nameOf = B._gates && B._gates.optName;
+      (D.byLevel.CSD || []).forEach(function (p) {
+        var n = nameOf ? nameOf(p) : p.name;
+        if (n && optIndex[n] == null) optIndex[n] = p.code;
+      });
+    }
+    return optIndex[label] || null;
+  }
+
+  function optionCodes(it) {
+    /* an item may carry the places outright (the ordering question, whose
+       options are orderings and name nothing a lookup could find) */
+    if (it.places && it.places.length) return it.places.slice();
+    var codes = it.options.map(function (o) { return codeOf(o.label); });
+    return codes.every(function (c) { return !!c; }) ? codes : null;
+  }
+
+  /* a place is "named in the stem" when its own name is in the sentence */
+  function stemNames(it) {
+    if (!it.place) return null;
+    var p = D.byCode[it.place];
+    if (!p || p.level !== 'CSD' || p.lat == null) return null;
+    var nameOf = B._gates && B._gates.optName;
+    var n = (nameOf ? nameOf(p) : p.name) || p.name;
+    return it.stem.indexOf(n) >= 0 || it.stem.indexOf(p.name) >= 0 ? p.code : null;
+  }
+
+  function mapSpec(it, phase) {
+    /* a question about a county is drawn as that county: the births and
+       deaths questions name a census division, which is exactly the kind of
+       name a reader cannot place */
+    if (it.cd && !it.place && QM) return { cd: it.cd };
+    var subject = stemNames(it);
+    var codes = optionCodes(it);
+    if (phase === 'ask') {
+      if (subject) return { subject: subject };
+      return codes ? { others: codes } : null;
+    }
+    /* the answer screen */
+    var right = it.options.filter(function (o) { return o.correct; })[0];
+    var rightCode = right ? codeOf(right.label) : null;
+    if (subject && rightCode && rightCode !== subject) {
+      var flow = /commute-out|commute-in/.test(it.form) ? rightCode : null;
+      return { subject: subject, others: [rightCode], flowTo: flow };
+    }
+    if (subject) return { subject: subject };
+    if (codes && rightCode) return { subject: rightCode, others: codes.filter(
+      function (c) { return c !== rightCode; }) };
+    return codes ? { others: codes } : null;
+  }
+
+  /* Rendered into a placeholder, because the basemap is fetched the first
+     time a question wants it (4 KB, once a session). */
+  function mapSlot(it, phase) {
+    if (!QM || !mapSpec(it, phase)) return '';
+    return '<div class="qmap-slot" data-phase="' + phase + '"></div>';
+  }
+
+  function fillMap(wrap, it, phase) {
+    var slot = wrap.querySelector('.qmap-slot');
+    if (!slot || !QM) return;
+    var spec = mapSpec(it, phase);
+    var draw = function () {
+      if (!QM.ready()) return;
+      slot.innerHTML = QM.svg(spec);
+      wireSpeakers(wrap);
+    };
+    if (QM.ready()) draw(); else QM.load().then(draw);
+  }
 
   function autoRead(node) {
     if (!R || !R.available() || !settings().read || !node) return;
@@ -678,7 +810,9 @@
       '<details class="qsettings"><summary>Settings</summary><div class="qset">' +
       (A.isQuiet && A.isQuiet() ? '' :
         '<label class="toggle"><input type="checkbox" class="qread"' +
-        (set.read ? ' checked' : '') + '> Read each question to me</label>') +
+        (set.read ? ' checked' : '') + '> Read each question to me</label>' +
+        '<label class="toggle"><input type="checkbox" class="qospk"' +
+        (set.optSpk ? ' checked' : '') + '> A speaker beside every option</label>') +
       '<label class="toggle"><input type="checkbox" class="qjump"' +
       (s.jumpAhead ? ' checked' : '') + '> Open every big idea now</label>' +
       '<label class="qhome">Your home region: <select class="sel qhomesel">' +
@@ -701,6 +835,10 @@
     var rd = body.querySelector('.qread');
     if (rd) rd.addEventListener('change', function (e) {
       var x = settings(); x.read = e.target.checked; saveSettings(x);
+    });
+    var os = body.querySelector('.qospk');
+    if (os) os.addEventListener('change', function (e) {
+      var x = settings(); x.optSpk = e.target.checked; saveSettings(x);
     });
     body.querySelector('.qjump').addEventListener('change', function (e) {
       s.jumpAhead = e.target.checked; S.save(s); A.render();

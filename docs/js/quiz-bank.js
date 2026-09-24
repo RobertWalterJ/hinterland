@@ -192,6 +192,10 @@
     return {
       id: o.id, strand: o.strand, form: o.form, facet: o.facet || o.form,
       place: o.place || null, cd: o.cd || null, region: o.region || null,
+      /* the places the question is ABOUT, where the options do not name them
+         one for one - the ordering question's options are orderings, so the
+         locator map has nothing to look up without this */
+      places: o.places || null,
       chip: o.chip, stem: o.stem, prompt: o.prompt || null,
       options: opts, card: o.card, more: o.more || null,
       tags: o.tags || [], surprise: o.surprise || 0,
@@ -868,6 +872,7 @@
           out.push(item({
             id: 'A3:' + [a.code, b.code, c.code].join('-'),
             strand: 'A', form: 'order-three', place: a.code, cd: cd,
+            places: [a.code, b.code, c.code],
             chip: CHIP.work,
             stem: 'Which order, from most jobs to fewest?',
             options: [

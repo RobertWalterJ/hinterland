@@ -37,6 +37,7 @@ import os
 import re
 import sqlite3
 import struct
+import zlib
 import subprocess
 import sys
 import tempfile
@@ -1536,6 +1537,72 @@ def test_demography(con):
               "Toronto CD 2019 implied change %+.0f" % implied)
 
 
+def test_locator():
+    """The map a question carries, and the words that go with it.
+
+    Robert could not place Dysart et al, Cramahe or North Kawartha, and the
+    question asked him which of them was a factory town. The answer was a
+    basemap of its own - 8 KB, built by pipeline/make_locator.py - and these
+    are the things that must stay true of it: that it is small enough to
+    fetch on a question, that everything in it is inside Ontario, that no
+    water label has drifted onto the land, and that the places the quiz asks
+    about can actually be drawn.
+    """
+    head("11. The map beside the question")
+
+    path = os.path.join(ROOT, "app", "data", "locator.json")
+    if not os.path.exists(path):
+        check("the locator basemap is built", False,
+              "run python pipeline/make_locator.py")
+        return
+    raw = io.open(path, "rb").read()
+    doc = json.loads(raw.decode("utf-8"))
+    gz = len(zlib.compress(raw, 9))
+    check("the basemap is small enough to fetch on a question",
+          gz <= 24 * 1024,
+          "%.0f KB gzipped (the boundary file it replaces is 286 KB)" % (gz / 1024.0))
+
+    x0, y0, x1, y1 = doc["bbox"]
+    pts = [c for line in doc["lines"] for c in line]
+    inside = all(x0 - 0.1 <= c[0] <= x1 + 0.1 and y0 - 0.1 <= c[1] <= y1 + 0.1
+                 for c in pts)
+    check("every point of the coastline is inside Ontario's bounding box",
+          inside and len(pts) > 400,
+          "%d points in %d chains" % (len(pts), len(doc["lines"])))
+
+    # a water label on land is the one error that would mislead outright
+    csds = json.load(io.open(os.path.join(ROOT, "app", "data", "geo.json"),
+                             encoding="utf-8"))
+    ix = {n: i for i, n in enumerate(csds["fields"])}
+    near_land = 0
+    for w in doc.get("water", []):
+        for row in csds["places"]:
+            if row[ix["level"]] != "CSD" or row[ix["lat"]] is None:
+                continue
+            if (abs(row[ix["lat"]] - w["lat"]) < 0.03 and
+                    abs(row[ix["lon"]] - w["lon"]) < 0.03):
+                near_land += 1
+                break
+    check("no water label sits on a municipality's own centre",
+          near_land == 0, "%d water labels" % len(doc.get("water", [])))
+
+    check("the map carries counties and built-up areas, not just a coastline",
+          len(doc.get("counties", [])) >= 20 and len(doc.get("urban", [])) >= 20,
+          "%d county lines, %d built-up shapes, %d county names" % (
+              len(doc.get("counties", [])), len(doc.get("urban", [])),
+              len(doc.get("county_names", []))))
+
+    named = {c["cd"] for c in doc.get("county_names", [])}
+    check("every census division the quiz can name has a place on the map",
+          len(named) >= 45, "%d of 49 divisions" % len(named))
+
+    anchors = doc.get("anchors", [])
+    spread = (len(anchors) >= 10 and
+              max(a["lat"] for a in anchors) - min(a["lat"] for a in anchors) > 4)
+    check("the cities offered for reference span the province",
+          spread, ", ".join(a["name"].split(" /")[0] for a in anchors[:6]) + ", ...")
+
+
 def main():
     if not os.path.exists(DB):
         print("no database - run pipeline/build.py first")
@@ -1553,6 +1620,7 @@ def main():
     test_stated_constants()
     test_findings_engine()
     test_quiz()
+    test_locator()
 
     print("\n" + "=" * 62)
     if FAILS:

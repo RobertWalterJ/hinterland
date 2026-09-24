@@ -23,7 +23,7 @@ const APP = path.join(ROOT, 'app');
 
 /* the app modules that run without a DOM, in load order */
 const HEADLESS = ['methods.js', 'charts.js', 'data.js', 'terms.js', 'history.js',
-                  'quiz-bank.js', 'quiz-ideas.js', 'quiz-sched.js'];
+                  'quiz-bank.js', 'quiz-ideas.js', 'quiz-sched.js', 'quiz-story.js'];
 
 let cached = null;
 
