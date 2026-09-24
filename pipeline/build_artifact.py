@@ -31,15 +31,19 @@ OUT = os.path.join(ROOT, "build", "artifact")
 # here: a second copy of what the page loads is a copy that drifts, and the
 # failure mode is a published page whose scripts 404 - a blank app, with a
 # build log that says everything is fine.
-ASSETS = [
-    "manifest.webmanifest",
-    "icon-192.png", "icon-512.png",
-    "data/geo.json", "data/work_csd.json", "data/work_ct.json",
-    "data/res_series.json", "data/population.json", "data/commute.json",
-    "data/business.json", "data/meta.json", "data/ct_csd.json",
-    "data/components.json", "data/io.json", "data/detail.json",
-    "data/boundaries_csd.json", "data/boundaries_ct.json",
-]
+# The payloads are READ OFF THE FOLDER for the same reason. A hand-kept list
+# of them drifted the day the locator basemap was added: the app published
+# fine, and the map silently 404ed on a phone.
+STATIC = ["manifest.webmanifest", "icon-192.png", "icon-512.png"]
+
+
+def assets(app):
+    out = list(STATIC)
+    data = os.path.join(app, "data")
+    for name in sorted(os.listdir(data)):
+        if name.endswith(".json"):
+            out.append("data/" + name)
+    return out
 
 
 def referenced(html):
@@ -60,7 +64,7 @@ def companions():
     if missing:
         raise SystemExit("index.html references files that do not exist: %s"
                          % ", ".join(missing))
-    return refs + ASSETS
+    return refs + assets(APP)
 
 
 COMPANIONS = companions()
