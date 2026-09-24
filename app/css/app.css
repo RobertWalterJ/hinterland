@@ -1535,14 +1535,15 @@ body.is-quiet .qspk, body.is-quiet .playbtn { display: none !important; }
    lines: the ground the question stands on, drawn quietly under it */
 .lm-urban { fill: #e7e0d2; stroke: none; }
 /* the county a question is about: the shape, not a pin in the middle of it */
-.lm-here { fill: rgba(28, 26, 23, 0.055); stroke: #a79f8e;
-  stroke-width: 2.2; stroke-linejoin: round; }
+.lm-here { fill: rgba(28, 26, 23, 0.05); stroke: #ada597;
+  stroke-width: 1.8; stroke-linejoin: round; }
 .lm-here.is-subject { fill: rgba(28, 26, 23, 0.10); stroke: var(--ink-2);
   stroke-width: 2.5; }
-.lm-county { fill: none; stroke: #c2bcae; stroke-width: 1.4; }
+.lm-county { fill: none; stroke: #c6c0b2; stroke-width: 1.3;
+  stroke-linejoin: round; stroke-linecap: round; }
 .lm-ctext { fill: #8d8677; font-size: 25px; font-family: var(--sans);
   letter-spacing: 0.16em; }
-.lm-land { fill: var(--surface-2); stroke: #9fb0b8; stroke-width: 2;
+.lm-land { fill: var(--surface-2); stroke: #9cadb5; stroke-width: 1.8;
   stroke-linejoin: round; }
 
 /* reference cities: present, quiet, hollow */
@@ -1579,36 +1580,39 @@ body.is-quiet .qspk, body.is-quiet .playbtn { display: none !important; }
   color: var(--ink-2); }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .lm-water { fill: #1d2a31; }
-  :root:not([data-theme="light"]) .lm-land { fill: var(--surface-1);
-    stroke: #4d6570; }
+  /* In the dark theme the land was var(--surface-1) against water at
+     #1d2a31 - four points of lightness apart, so a whole district of
+     northern Ontario read as lake. Land is lifted and water dropped until
+     the two are plainly different values, which is the one thing a map of
+     a lake-covered province cannot get wrong. */
+  :root:not([data-theme="light"]) .lm-water { fill: #0b141a; }
+  :root:not([data-theme="light"]) .lm-land { fill: #36332c; stroke: #5d7885; }
   :root:not([data-theme="light"]) .lm-wtext { fill: #7fa3b2; }
   :root:not([data-theme="light"]) .lm-atext,
   :root:not([data-theme="light"]) .lm-text,
   :root:not([data-theme="light"]) .lm-scale-t { stroke: var(--surface-1); }
   :root:not([data-theme="light"]) .lm-ring { stroke: var(--surface-1); }
-  :root:not([data-theme="light"]) .lm-key-water { fill: #1d2a31; }
-  :root:not([data-theme="light"]) .lm-key-land { fill: var(--surface-1);
-    stroke: #4d6570; }
-  :root:not([data-theme="light"]) .lm-urban { fill: #2f2a22; }
-  :root:not([data-theme="light"]) .lm-here { fill: rgba(242, 240, 234, 0.13);
-    stroke: var(--ink-2); }
-  :root:not([data-theme="light"]) .lm-county { stroke: #55503f; }
+  :root:not([data-theme="light"]) .lm-key-water { fill: #0b141a; }
+  :root:not([data-theme="light"]) .lm-key-land { fill: #36332c; stroke: #5d7885; }
+  :root:not([data-theme="light"]) .lm-urban { fill: #423c30; }
+  :root:not([data-theme="light"]) .lm-here { fill: rgba(242, 240, 234, 0.09);
+    stroke: #8d8577; }
+  :root:not([data-theme="light"]) .lm-county { stroke: #635c4a; }
   :root:not([data-theme="light"]) .lm-ctext { fill: #8a8372; }
 }
-:root[data-theme="dark"] .lm-water { fill: #1d2a31; }
-:root[data-theme="dark"] .lm-land { fill: var(--surface-1); stroke: #4d6570; }
+:root[data-theme="dark"] .lm-water { fill: #0b141a; }
+:root[data-theme="dark"] .lm-land { fill: #36332c; stroke: #5d7885; }
 :root[data-theme="dark"] .lm-wtext { fill: #7fa3b2; }
 :root[data-theme="dark"] .lm-atext,
 :root[data-theme="dark"] .lm-text,
 :root[data-theme="dark"] .lm-scale-t { stroke: var(--surface-1); }
 :root[data-theme="dark"] .lm-ring { stroke: var(--surface-1); }
-:root[data-theme="dark"] .lm-key-water { fill: #1d2a31; }
-:root[data-theme="dark"] .lm-key-land { fill: var(--surface-1); stroke: #4d6570; }
-:root[data-theme="dark"] .lm-urban { fill: #2f2a22; }
-:root[data-theme="dark"] .lm-here { fill: rgba(242, 240, 234, 0.13);
-  stroke: var(--ink-2); }
-:root[data-theme="dark"] .lm-county { stroke: #55503f; }
+:root[data-theme="dark"] .lm-key-water { fill: #0b141a; }
+:root[data-theme="dark"] .lm-key-land { fill: #36332c; stroke: #5d7885; }
+:root[data-theme="dark"] .lm-urban { fill: #423c30; }
+:root[data-theme="dark"] .lm-here { fill: rgba(242, 240, 234, 0.09);
+  stroke: #8d8577; }
+:root[data-theme="dark"] .lm-county { stroke: #635c4a; }
 :root[data-theme="dark"] .lm-ctext { fill: #8a8372; }
 
 

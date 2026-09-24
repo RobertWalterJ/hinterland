@@ -40,9 +40,15 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 APP = os.path.join(ROOT, "app", "data")
 
-CELL = 0.02          # degrees; about 2.2 km north-south
-SIMPLIFY = 0.035     # degrees; Douglas-Peucker tolerance
-KEEP_CHAIN = 6       # a chain shorter than this is a pixel, not an island
+# The grid is the resolution of everything this file makes, and it has to be
+# fine enough for the CLOSEST the quiz ever zooms in - about 95 km across a
+# phone screen, which is 1 km to 10 pixels. At 0.02 degrees the outlines were
+# 2 km a vertex, and once the renderer smoothed the staircase out of them
+# Lake Simcoe came back as a blob. Halving the cell costs four times the
+# raster work at build time, once, and about 12 KB on the wire.
+CELL = 0.01          # degrees; about 1.1 km north-south
+SIMPLIFY = 0.014     # degrees; Douglas-Peucker tolerance
+KEEP_CHAIN = 10      # a chain shorter than this is a pixel, not an island
 ANCHORS = 14
 ANCHOR_APART_KM = 70
 
@@ -296,12 +302,18 @@ def main():
         bnd["features"],
         lambda f: cd_num.get(cd_of.get(f["properties"].get("id"), ""), 0),
         x0, y0, nx, ny)
-    # The first version drew county boundaries as the network of edges
-    # between different counties. It looked arbitrary on screen and it was:
-    # that network stops wherever a county meets water or an unorganised gap,
-    # so the lines wander off and never close, and what the reader sees is
-    # fragments. Counties are drawn from their own closed outlines instead
-    # (county_of, below) - each is a shape, which is what a county is.
+    # Counties are shipped TWICE, because they do two jobs.
+    #
+    # county_of, below, is each county as a closed shape: that is what gets
+    # filled when a question is about a county or a place inside one.
+    #
+    # county_lines is only the boundaries BETWEEN counties - the edges where
+    # land meets land. Where a county's edge is the shore, the coastline
+    # already draws it, and drawing it again lays a second line a cell inside
+    # the first: a faint double coastline, which is half of what made these
+    # look wonky. A boundary that is a shoreline is a shoreline.
+    county_lines = chains_to_deg(stitch(inner_edges(cd_grid, nx, ny)),
+                                 x0, y0, SIMPLIFY, keep=4)
 
     # where each county's name can be written: the middle of its own cells
     sums = {}
@@ -394,7 +406,7 @@ def main():
         g2 = rasterise_ids(dense_ct, lambda f: 1, x0, y0, nx, ny)
         urban_mask = bytearray(1 if v else 0 for v in g2)
         urban = chains_to_deg(stitch(edges_of(urban_mask, nx, ny)),
-                              x0, y0, SIMPLIFY * 0.35, keep=6)
+                              x0, y0, SIMPLIFY * 0.6, keep=10)
 
     cities = []
     for row in geo["places"]:
@@ -469,6 +481,7 @@ def main():
         "cell_deg": CELL,
         "bbox": [round(x0, 3), round(y0, 3), round(x1, 3), round(y1, 3)],
         "lines": lines,
+        "counties": county_lines,
         "county_names": counties,
         "county_of": county_of,
         "urban": urban,
@@ -490,9 +503,10 @@ def main():
     print("  %.0f KB raw, %.0f KB gzipped" % (raw / 1024.0, gz / 1024.0))
     print("  anchors: " + ", ".join(a["name"] for a in doc["anchors"]))
     print("  water labels: %d of %d placed in water" % (len(water), len(WATER)))
-    print("  counties: %d named, %d shaped; built-up: %d shapes "
-          "(%d dense tracts)" % (len(counties), len(county_of), len(urban),
-                                 tracts))
+    print("  counties: %d named, %d shaped, %d inland boundaries; "
+          "built-up: %d shapes (%d dense tracts)"
+          % (len(counties), len(county_of), len(county_lines), len(urban),
+             tracts))
 
 
 if __name__ == "__main__":

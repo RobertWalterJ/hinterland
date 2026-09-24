@@ -1558,8 +1558,12 @@ def test_locator():
     raw = io.open(path, "rb").read()
     doc = json.loads(raw.decode("utf-8"))
     gz = len(zlib.compress(raw, 9))
+    # The budget went from 24 to 40 KB when the grid was halved to 1 km: at
+    # 2 km the outlines were coarser than the closest zoom the quiz uses, and
+    # once the renderer smoothed the staircase out of them Lake Simcoe came
+    # back as a blob. Still an order of magnitude under the boundary file.
     check("the basemap is small enough to fetch on a question",
-          gz <= 24 * 1024,
+          gz <= 40 * 1024,
           "%.0f KB gzipped (the boundary file it replaces is 286 KB)" % (gz / 1024.0))
 
     x0, y0, x1, y1 = doc["bbox"]

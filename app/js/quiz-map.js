@@ -40,6 +40,7 @@
 
   var M = {};
   var D = root.GRA.data;
+  var clipN = 0;                /* one clip path per drawn map */
   var base = null;              /* the basemap, once fetched */
   var pending = null;
 
@@ -245,14 +246,57 @@
     });
   }
 
+  /* Every outline on this map is traced from a raster of about two
+     kilometres a cell and then thinned, so what comes out is a staircase
+     with the treads knocked off: right angles, 45-degree runs, and long
+     straight chords where the thinning found nothing worth keeping. Drawn
+     as straight segments it reads as wonky, which is what Robert called it -
+     a county border does not have corners at every second kilometre.
+
+     So the polyline is drawn as a curve: the path runs from midpoint to
+     midpoint of consecutive segments, with each original vertex used as the
+     control point of a quadratic. That is corner-cutting, done in the
+     renderer rather than in the data - it costs no bytes, it cannot drift
+     from the source, and it is the same generalisation a draughtsman does by
+     hand. The curve stays within half a cell of the traced line, which at
+     this scale is under a pixel. */
+  function smooth(pts, open) {
+    var n = pts.length;
+    if (n < 3) {
+      return 'M' + pts.map(function (q) {
+        return q[0].toFixed(1) + ' ' + q[1].toFixed(1);
+      }).join('L');
+    }
+    function mid(a, b) { return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; }
+    var closed = pts[0][0] === pts[n - 1][0] && pts[0][1] === pts[n - 1][1];
+    if (closed) { pts = pts.slice(0, n - 1); n -= 1; }
+    var d, i, c, m;
+    if (!closed || open) {
+      /* an open chain - a boundary between two counties - keeps its ends
+         where they are, or it appears to stop short of the coast */
+      d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+      for (i = 1; i < n - 1; i++) {
+        c = pts[i];
+        m = mid(c, pts[i + 1]);
+        d += 'Q' + c[0].toFixed(1) + ' ' + c[1].toFixed(1) + ' ' +
+             m[0].toFixed(1) + ' ' + m[1].toFixed(1);
+      }
+      return d + 'L' + pts[n - 1][0].toFixed(1) + ' ' + pts[n - 1][1].toFixed(1);
+    }
+    var m0 = mid(pts[n - 1], pts[0]);
+    d = 'M' + m0[0].toFixed(1) + ' ' + m0[1].toFixed(1);
+    for (i = 0; i < n; i++) {
+      c = pts[i];
+      m = mid(c, pts[(i + 1) % n]);
+      d += 'Q' + c[0].toFixed(1) + ' ' + c[1].toFixed(1) + ' ' +
+           m[0].toFixed(1) + ' ' + m[1].toFixed(1);
+    }
+    return d + 'Z';
+  }
+
   function pathFor(X, Y, lines) {
     return (lines || base.lines).map(function (line) {
-      var d = '';
-      for (var i = 0; i < line.length; i++) {
-        d += (i ? 'L' : 'M') + X(line[i][0]).toFixed(1) + ' ' +
-             Y(line[i][1]).toFixed(1);
-      }
-      return d + 'Z';
+      return smooth(line.map(function (c) { return [X(c[0]), Y(c[1])]; }));
     }).join('');
   }
 
@@ -316,6 +360,13 @@
     var Y = function (lat) { return P.y(lat) * s; };
 
     var land = pathFor(X, Y);
+    /* Counties and built-up areas are clipped to the land. They are traced
+       from the same raster as the coast but thinned on their own, so along a
+       lake shore the two lines disagree by a cell or two and a county appears
+       to spill into the water. Clipping is the honest fix: the coast is the
+       coast, and nothing administrative is drawn over it. */
+    var clipId = 'lmclip' + (clipN = (clipN || 0) + 1);
+    var clip = '<clipPath id="' + clipId + '"><path d="' + land + '"/></clipPath>';
     /* Counties and built-up areas, which Robert asked for after the first
        map: an outline with two dots on it gives an inland place nothing to
        sit in. The tint is where the people are (Statistics Canada's own
@@ -337,23 +388,21 @@
     var hereCd = subject ? subject.cd : null;
     if (hereCd && base.county_of && base.county_of[hereCd]) {
       here = '<path class="lm-here' + (subject.level === 'CD' ? ' is-subject' : '') +
-        '" fill-rule="evenodd" d="' + pathFor(X, Y, base.county_of[hereCd]) + '"/>';
+        '" fill-rule="evenodd" clip-path="url(#' + clipId + ')" d="' +
+        pathFor(X, Y, base.county_of[hereCd]) + '"/>';
     }
     var urban = base.urban && base.urban.length
-      ? '<path class="lm-urban" fill-rule="evenodd" d="' +
-        pathFor(X, Y, base.urban) + '"/>' : '';
-    /* Counties as closed outlines, from their own shapes. The first version
-       drew the network of edges between them, which stops wherever a county
-       meets water and so came out as wandering fragments. */
-    var counties = '';
-    if (base.county_of && (f[2] - f[0]) <= 9) {
-      var d = '';
-      Object.keys(base.county_of).forEach(function (cd) {
-        if (cd === hereCd) return;            /* that one is drawn filled */
-        d += pathFor(X, Y, base.county_of[cd]);
-      });
-      counties = '<path class="lm-county" fill="none" d="' + d + '"/>';
-    }
+      ? '<path class="lm-urban" fill-rule="evenodd" clip-path="url(#' + clipId +
+        ')" d="' + pathFor(X, Y, base.urban) + '"/>' : '';
+    /* Only the boundaries BETWEEN counties. A county's shoreline is drawn by
+       the coast, and drawing it again from the county's own outline laid a
+       second line a cell inside the first - a faint double coastline, and
+       half of what made these look wonky. They are open chains, so they are
+       stroked, never filled, and clipped to the land like everything
+       administrative. */
+    var counties = (base.counties && base.counties.length && (f[2] - f[0]) <= 9)
+      ? '<path class="lm-county" fill="none" clip-path="url(#' + clipId +
+        ')" d="' + pathFor(X, Y, base.counties) + '"/>' : '';
 
     /* Labels are placed, not just drawn: each claims a box, and one that
        cannot find a free spot beside, above or below its mark is dropped
@@ -487,6 +536,7 @@
     return '<figure class="locmap" data-say="' + esc(say) + '">' +
       '<svg viewBox="0 0 ' + W + ' ' + H + '" class="lm-svg" ' +
       'role="img" aria-label="' + esc(say) + '">' +
+      clip +
       '<rect class="lm-water" x="0" y="0" width="' + W + '" height="' + H + '"/>' +
       '<path class="lm-land" fill-rule="evenodd" d="' + land + '"/>' +
       here + urban + counties + countyLabel +
