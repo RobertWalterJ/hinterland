@@ -1586,11 +1586,18 @@ def test_locator():
     check("no water label sits on a municipality's own centre",
           near_land == 0, "%d water labels" % len(doc.get("water", [])))
 
+    # Counties are shipped as closed shapes, one per division, not as the
+    # network of edges between them: that network stops wherever a county
+    # meets water, so it drew as wandering fragments (Robert, 24 Sept).
+    shapes = doc.get("county_of", {})
     check("the map carries counties and built-up areas, not just a coastline",
-          len(doc.get("counties", [])) >= 20 and len(doc.get("urban", [])) >= 20,
-          "%d county lines, %d built-up shapes, %d county names" % (
-              len(doc.get("counties", [])), len(doc.get("urban", [])),
+          len(shapes) >= 45 and len(doc.get("urban", [])) >= 20,
+          "%d counties as closed shapes, %d built-up shapes, %d county names" % (
+              len(shapes), len(doc.get("urban", [])),
               len(doc.get("county_names", []))))
+    closed = all(rings[0][0] == rings[0][-1]
+                 for rings in shapes.values() if rings and len(rings[0]) > 2)
+    check("every county outline closes", closed, "%d shapes" % len(shapes))
 
     named = {c["cd"] for c in doc.get("county_names", [])}
     check("every census division the quiz can name has a place on the map",

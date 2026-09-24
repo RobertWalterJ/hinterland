@@ -296,8 +296,12 @@ def main():
         bnd["features"],
         lambda f: cd_num.get(cd_of.get(f["properties"].get("id"), ""), 0),
         x0, y0, nx, ny)
-    county_lines = chains_to_deg(stitch(inner_edges(cd_grid, nx, ny)),
-                                 x0, y0, SIMPLIFY, keep=4)
+    # The first version drew county boundaries as the network of edges
+    # between different counties. It looked arbitrary on screen and it was:
+    # that network stops wherever a county meets water or an unorganised gap,
+    # so the lines wander off and never close, and what the reader sees is
+    # fragments. Counties are drawn from their own closed outlines instead
+    # (county_of, below) - each is a shape, which is what a county is.
 
     # where each county's name can be written: the middle of its own cells
     sums = {}
@@ -370,24 +374,27 @@ def main():
     # not a survey of the built form: it is where the people are, at the
     # finest grain the payloads carry, and it is drawn as a tint rather than
     # a boundary because that is what it deserves.
+    # CENSUS TRACTS ONLY. The first version fell back to whole municipalities
+    # wherever there are no tracts, which drew a township's entire legal
+    # boundary as though it were a built-up area: triangles and wedges in the
+    # middle of farmland, which is exactly what Robert called arbitrary. A
+    # tract is small enough to separate a town from the fields around it; a
+    # township is not. Outside the metropolitan areas there are no tracts, so
+    # nothing is drawn - which is honest, and better than a shape that says
+    # something untrue.
     URBAN = 400.0
-    dense_csd = [f for f in bnd["features"]
-                 if density.get(f["properties"].get("id"), 0) >= URBAN]
-    urban_grid = rasterise_ids(dense_csd, lambda f: 1, x0, y0, nx, ny)
-    ct_path = os.path.join(APP, "boundaries_ct.json")
     tracts = 0
+    urban = []
+    ct_path = os.path.join(APP, "boundaries_ct.json")
     if os.path.exists(ct_path):
         ct = json.load(io.open(ct_path, encoding="utf-8"))
         dense_ct = [f for f in ct["features"]
                     if density.get(f["properties"].get("id"), 0) >= URBAN]
         tracts = len(dense_ct)
         g2 = rasterise_ids(dense_ct, lambda f: 1, x0, y0, nx, ny)
-        for i, v in enumerate(g2):
-            if v:
-                urban_grid[i] = 1
-    urban_mask = bytearray(1 if v else 0 for v in urban_grid)
-    urban = chains_to_deg(stitch(edges_of(urban_mask, nx, ny)),
-                          x0, y0, SIMPLIFY * 0.7, keep=4)
+        urban_mask = bytearray(1 if v else 0 for v in g2)
+        urban = chains_to_deg(stitch(edges_of(urban_mask, nx, ny)),
+                              x0, y0, SIMPLIFY * 0.35, keep=6)
 
     cities = []
     for row in geo["places"]:
@@ -462,7 +469,6 @@ def main():
         "cell_deg": CELL,
         "bbox": [round(x0, 3), round(y0, 3), round(x1, 3), round(y1, 3)],
         "lines": lines,
-        "counties": county_lines,
         "county_names": counties,
         "county_of": county_of,
         "urban": urban,
@@ -484,9 +490,9 @@ def main():
     print("  %.0f KB raw, %.0f KB gzipped" % (raw / 1024.0, gz / 1024.0))
     print("  anchors: " + ", ".join(a["name"] for a in doc["anchors"]))
     print("  water labels: %d of %d placed in water" % (len(water), len(WATER)))
-    print("  counties: %d lines, %d named, %d shaped; built-up: %d shapes "
-          "(%d dense tracts)" % (len(county_lines), len(counties),
-                                 len(county_of), len(urban), tracts))
+    print("  counties: %d named, %d shaped; built-up: %d shapes "
+          "(%d dense tracts)" % (len(counties), len(county_of), len(urban),
+                                 tracts))
 
 
 if __name__ == "__main__":

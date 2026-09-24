@@ -677,24 +677,71 @@
     });
   }
 
-  /* E2 - what a method CANNOT tell you. The limit is the part of a method
-     people forget, and the one that stops a result being overread. */
-  function genCannot(out) {
-    T.list.filter(function (t) { return t.kind === 'method'; }).forEach(function (t) {
-      var others = T.list.filter(function (o) {
-        return o.kind === 'method' && o.group !== t.group;
+  /* E2 - which question a method answers, and the limit that comes with it.
+
+     THIS SHAPE REPLACED A BROKEN ONE, 24 Sept. The old question asked "a
+     limit of the location quotient?" and offered three limits, one taken
+     from that method and two from others. Robert met it on his phone and
+     said, correctly, that it was ambiguous. It was worse than ambiguous: of
+     the three offered, two were TRUE of the location quotient. "It cannot
+     say who fills the jobs" is true of any place-of-work measure, and "it
+     says a pattern is clustered, not why" is true of any descriptive
+     statistic. The generator had assumed that a limit written against one
+     method is false of every other, and the limits in terms.js are not
+     written that narrowly - they are not written to be wrong anywhere.
+
+     The keyed answer was not more true than the distractors, only more
+     attached. No audit caught it: accuracy checks that the KEY is supported,
+     and guessability checks that no one can win without knowledge. Neither
+     asks whether a wrong option is actually wrong.
+
+     So the item is built the other way round now, on the one pairing the
+     data really does key: the method map says which question each method
+     answers, and E1 already relies on it. The distractors are questions from
+     methods in different GROUPS - space against change against labour - so
+     no reading of them is defensible. The limit is still taught: it is on
+     the answer card, stated, where a limit belongs. */
+  function genMethodAnswers(out) {
+    var rowOf = {};
+    T.map.forEach(function (row, ri) {
+      row.ids.forEach(function (id) { if (rowOf[id] == null) rowOf[id] = ri; });
+    });
+    /* the groups a row's methods belong to */
+    function groupsOf(row) {
+      var g = {};
+      row.ids.forEach(function (id) {
+        var t = T.byId[id];
+        if (t) g[t.group] = 1;
       });
+      return g;
+    }
+    T.list.filter(function (t) {
+      return t.kind === 'method' && rowOf[t.id] != null;
+    }).forEach(function (t) {
+      var mine = T.map[rowOf[t.id]];
+      var others = T.map.filter(function (row, ri) {
+        if (ri === rowOf[t.id]) return false;
+        var g = groupsOf(row);
+        /* nothing from this method's own family: those readings overlap, and
+           an overlapping reading is what made the old question unanswerable */
+        return !g[t.group];
+      });
+      if (others.length < 2) return;
       var pick = shuffle(others, 'E2' + t.id).slice(0, 2);
       out.push(item({
-        id: 'E2:' + t.id, strand: 'E', form: 'cannot',
+        id: 'E2:' + t.id, strand: 'E', form: 'method-answers',
         chip: CHIP.method,
-        stem: 'A limit of the ' + t.name.toLowerCase() + '?',
-        options: [{ label: t.cant, correct: true }].concat(pick.map(function (o) {
-          return { label: o.cant, correct: false };
+        stem: 'Which question does the ' + t.name.toLowerCase() + ' answer?',
+        options: [{ label: mine.q, correct: true }].concat(pick.map(function (r) {
+          return { label: r.q, correct: false };
         })),
-        card: { sentence: t.cant, picture: null },
+        card: {
+          sentence: cap(t.name) + ': ' + t.plain,
+          more: 'Its limit: ' + t.cant,
+          picture: null
+        },
         more: { term: t.id },
-        prior: 0.65, terms: [t.id]
+        prior: 0.55, terms: [t.id]
       }));
     });
   }
@@ -990,7 +1037,7 @@
     genShareVsOntario(out);
     genCommute(out, 'out'); genCommute(out, 'in'); genTwin(out);
     genNatural(out);
-    genWhichMethod(out); genCannot(out); genReadLQ(out);
+    genWhichMethod(out); genMethodAnswers(out); genReadLQ(out);
     genWhichFirst(out); genDataHistory(out);
     /* every question belongs to a big idea and a level, or it is not asked
        (quiz-ideas.js); the ideas add their own questions first */

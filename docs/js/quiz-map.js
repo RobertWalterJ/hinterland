@@ -328,17 +328,32 @@
        Stormont, Dundas and Glengarry is not where the county IS; the county
        is the shape, and shading it is the difference between a pin and a
        map. */
+    /* The county the question sits in, shaded - whether the question is
+       about the county itself or about a municipality inside it. Robert saw
+       the county lines as "strange and arbitrary", and a line network with
+       nothing named and nothing filled is exactly that: shading the one that
+       matters turns the rest into context. */
     var here = '';
-    var hereCd = subject && (subject.level === 'CD' ? subject.cd : null);
+    var hereCd = subject ? subject.cd : null;
     if (hereCd && base.county_of && base.county_of[hereCd]) {
-      here = '<path class="lm-here" fill-rule="evenodd" d="' +
-        pathFor(X, Y, base.county_of[hereCd]) + '"/>';
+      here = '<path class="lm-here' + (subject.level === 'CD' ? ' is-subject' : '') +
+        '" fill-rule="evenodd" d="' + pathFor(X, Y, base.county_of[hereCd]) + '"/>';
     }
     var urban = base.urban && base.urban.length
       ? '<path class="lm-urban" fill-rule="evenodd" d="' +
         pathFor(X, Y, base.urban) + '"/>' : '';
-    var counties = (base.counties && (f[2] - f[0]) <= 9)
-      ? '<path class="lm-county" d="' + pathFor(X, Y, base.counties) + '"/>' : '';
+    /* Counties as closed outlines, from their own shapes. The first version
+       drew the network of edges between them, which stops wherever a county
+       meets water and so came out as wandering fragments. */
+    var counties = '';
+    if (base.county_of && (f[2] - f[0]) <= 9) {
+      var d = '';
+      Object.keys(base.county_of).forEach(function (cd) {
+        if (cd === hereCd) return;            /* that one is drawn filled */
+        d += pathFor(X, Y, base.county_of[cd]);
+      });
+      counties = '<path class="lm-county" fill="none" d="' + d + '"/>';
+    }
 
     /* Labels are placed, not just drawn: each claims a box, and one that
        cannot find a free spot beside, above or below its mark is dropped
@@ -350,8 +365,11 @@
         return box[0] > t[2] || box[2] < t[0] || box[1] > t[3] || box[3] < t[1];
       });
     }
-    function place(px, py, text, size, cls, tries) {
-      var w = text.length * size * 0.54, h = size * 1.25;
+    function place(px, py, text, size, cls, tries, wide) {
+      /* the county name is set in spaced capitals, which is about a third
+         wider than the plain estimate - without allowing for it the label
+         claimed a box narrower than it drew and ran under the key map */
+      var w = text.length * size * (wide || 0.54), h = size * 1.25;
       for (var i = 0; i < tries.length; i++) {
         var dx = tries[i][0], dy = tries[i][1], anc = tries[i][2];
         var x = px + dx, y = py + dy;
@@ -369,6 +387,21 @@
                   [0, -20, 'middle'], [0, 34, 'middle'],
                   [18, -14, 'start'], [-18, -14, 'end']];
     var OVER = [[0, 0, 'middle'], [0, -26, 'middle'], [0, 26, 'middle']];
+    /* An area's name can sit anywhere inside the area, so it gets a ring of
+       places to try rather than three. The county label was being dropped
+       whenever its middle happened to fall near the town the question was
+       about, which on a county-sized window is most of the time. */
+    var AREA = [[0, 0, 'middle'], [0, -40, 'middle'], [0, 44, 'middle'],
+                [-80, 0, 'middle'], [80, 0, 'middle'],
+                [-80, -40, 'middle'], [80, -40, 'middle'],
+                [-80, 46, 'middle'], [80, 46, 'middle'],
+                [0, -80, 'middle'], [0, 86, 'middle'],
+                /* far enough left or right to clear the key map: a county
+                   name can be half the width of the picture, and STORMONT,
+                   DUNDAS AND GLENGARRY had nowhere to go without these */
+                [-200, 0, 'middle'], [200, 0, 'middle'],
+                [-200, -40, 'middle'], [-200, 46, 'middle'],
+                [-320, 0, 'middle'], [320, 0, 'middle']];
 
     /* the key map claims its corner before any label is placed */
     var key = keyMap(f, W);
@@ -407,7 +440,8 @@
       if (cn) {
         var cx2 = X(cn.lon), cy2 = Y(cn.lat);
         if (cx2 > 40 && cx2 < W - 40 && cy2 > 30 && cy2 < H - 50) {
-          countyLabel = place(cx2, cy2, cn.name.toUpperCase(), 25, 'lm-ctext', OVER);
+          countyLabel = place(cx2, cy2, cn.name.toUpperCase(), 25, 'lm-ctext',
+                              AREA, 0.75);
         }
       }
     }

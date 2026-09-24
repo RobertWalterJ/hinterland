@@ -79,7 +79,7 @@ const BY_FORM = {
   'type-area': 'class-rule',
   'read-number': 'read-a-number',
   'which-method': 'judge-a-method',
-  cannot: 'judge-a-method',
+  'method-answers': 'judge-a-method',
   concept: 'judge-a-method',
   'which-first': 'order-in-time',
   yesno: 'true-or-false',

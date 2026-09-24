@@ -1535,10 +1535,11 @@ body.is-quiet .qspk, body.is-quiet .playbtn { display: none !important; }
    lines: the ground the question stands on, drawn quietly under it */
 .lm-urban { fill: #e7e0d2; stroke: none; }
 /* the county a question is about: the shape, not a pin in the middle of it */
-.lm-here { fill: rgba(28, 26, 23, 0.10); stroke: var(--ink-2);
-  stroke-width: 2.5; stroke-linejoin: round; }
-.lm-county { fill: none; stroke: #b9b2a3; stroke-width: 1.6;
-  stroke-dasharray: 7 6; }
+.lm-here { fill: rgba(28, 26, 23, 0.055); stroke: #a79f8e;
+  stroke-width: 2.2; stroke-linejoin: round; }
+.lm-here.is-subject { fill: rgba(28, 26, 23, 0.10); stroke: var(--ink-2);
+  stroke-width: 2.5; }
+.lm-county { fill: none; stroke: #c2bcae; stroke-width: 1.4; }
 .lm-ctext { fill: #8d8677; font-size: 25px; font-family: var(--sans);
   letter-spacing: 0.16em; }
 .lm-land { fill: var(--surface-2); stroke: #9fb0b8; stroke-width: 2;

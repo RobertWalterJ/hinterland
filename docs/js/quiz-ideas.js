@@ -778,7 +778,7 @@
       case 'which-first': it.idea = 'change'; it.level = 2; return true;
       case 'which-method': it.idea = 'methods'; it.level = 1; return true;
       case 'read-number': it.idea = 'methods'; it.level = 2; return true;
-      case 'cannot': it.idea = 'methods'; it.level = 3; return true;
+      case 'method-answers': it.idea = 'methods'; it.level = 3; return true;
     }
     return false;
   };

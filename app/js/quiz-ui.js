@@ -393,8 +393,20 @@
         (tag ? '<span class="qtag">' + tag + '</span>' : '') + '</span></div>';
     }).join('') + '</div>';
 
-    var verdict = right ? 'Right: ' + correct.label + '.'
-      : 'You chose ' + opt.label + '. The answer is ' + correct.label + '.';
+    /* A label that is itself a sentence cannot be quoted inside another one:
+       "You chose It says a pattern is clustered, not why, and not where.. The
+       answer is It says nothing about growth, profit..." was what Robert got,
+       doubled full stops and all. Long labels are referred to by their letter
+       - the option list above already marks which is which, in words - and
+       short ones are still quoted, because "Right: Manufacturing" reads
+       better than "Right: B". */
+    function trim(t) { return String(t).replace(/\s*\.\s*$/, ''); }
+    var LONG = 34;
+    var verdict = right
+      ? (correct.label.length <= LONG ? 'Right: ' + trim(correct.label) + '.' : 'Right.')
+      : (correct.label.length <= LONG && opt.label.length <= LONG
+          ? 'You chose ' + trim(opt.label) + '. The answer is ' + trim(correct.label) + '.'
+          : 'Not that one. The answer is ' + correct.key + '.');
     /* The story behind the number (quiz-story.js). One sentence goes on the
        card, because Robert asked for the app to say WHY a place looks the way
        it does - Brockville's hospital and its catchment are both in the

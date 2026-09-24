@@ -842,7 +842,7 @@ function fmt(x) {
       }
 
       /* ------------------------------------------------ strand E: methods */
-      case 'which-method': case 'cannot': case 'read-number':
+      case 'which-method': case 'method-answers': case 'read-number':
         checkMethodItem(it);
         break;
 
@@ -959,11 +959,46 @@ function fmt(x) {
         hard('E', 'name', it.id, 'stem is a question from the method map',
              it.stem, 'not in terms.js T.map', where);
       }
-    } else if (it.form === 'cannot') {
-      const where = srcLine('quiz-bank.js', 'card: { sentence: t.cant');
-      if (s !== cap(t.cant)) {
-        hard('E', 'method', it.id, 'card restates the term\'s "cant" verbatim',
-             s.slice(0, 50) + '...', t.cant, where);
+    } else if (it.form === 'method-answers') {
+      const where = srcLine('quiz-bank.js', "'Which question does the '");
+      if (s !== cap(cap(t.name) + ': ' + t.plain)) {
+        hard('E', 'method', it.id, 'card restates the term verbatim',
+             s.slice(0, 50) + '...', t.name + ': ' + t.plain, where);
+      }
+      counted.method++;
+      if (it.card.more !== 'Its limit: ' + t.cant) {
+        hard('E', 'method', it.id, 'the limit, verbatim from terms.js',
+             String(it.card.more).slice(0, 50) + '...', t.cant, where);
+      }
+      /* the key must be the map's own pairing */
+      const correct = it.options.filter((o) => o.correct)[0];
+      const mine = T.map.filter((r) => r.ids.indexOf(t.id) >= 0)[0];
+      counted.method++;
+      if (!mine || correct.label !== mine.q) {
+        hard('E', 'method', it.id, 'the question this method answers',
+             correct.label, mine ? mine.q : 'no row in the method map', where);
+      }
+      /* and every distractor must belong to a different FAMILY of methods.
+         This is the check the old shape needed and did not have: it offered
+         three limits, two of which were also true of the method in the stem
+         (Robert, 24 Sept). A wrong option has to be wrong. */
+      for (const o of it.options) {
+        if (o.correct) continue;
+        counted.method++;
+        const row = T.map.filter((r) => r.q === o.label)[0];
+        if (!row) {
+          hard('E', 'method', it.id, 'distractor is a question from the map',
+               o.label, 'not in T.map', where);
+          continue;
+        }
+        const groups = row.ids.map((id) => T.byId[id] && T.byId[id].group);
+        if (groups.indexOf(t.group) >= 0) {
+          hard('E', 'method', it.id,
+               'distractor from a different family of methods',
+               o.label + ' (' + groups.join('/') + ')',
+               'not ' + t.group, where,
+               'a question its own family answers may be defensible for it too');
+        }
       }
     } else if (it.form === 'read-number') {
       const where = srcLine('quiz-bank.js', "'At ' + lq.toFixed(1)");
